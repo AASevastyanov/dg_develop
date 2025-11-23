@@ -1,0 +1,1 @@
+export default function Dashboard() { return <h1>Приватная зона</h1>; }

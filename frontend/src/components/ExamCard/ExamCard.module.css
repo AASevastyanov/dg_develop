@@ -1,0 +1,267 @@
+.examCardContainer {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 24px;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.examCardContainer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(242, 69, 57, 0.05) 0%, 
+    rgba(125, 80, 121, 0.05) 50%, 
+    rgba(16, 89, 178, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 24px;
+}
+
+.examCardContainer:hover::before {
+  opacity: 1;
+}
+
+.examCardContainer:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.12),
+    0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.examCardGlow {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, #F24539 0%, #7D5079 50%, #1059B2 100%);
+  border-radius: 26px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.examCardContainer:hover .examCardGlow {
+  opacity: 0.3;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.examCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 0;
+}
+
+.levelBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--level-color) 0%, color-mix(in srgb, var(--level-color) 80%, white) 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.levelBadge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.levelBadge:hover::before {
+  left: 100%;
+}
+
+.levelText {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.levelIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.examActions {
+  display: flex;
+  gap: 8px;
+}
+
+.favoriteBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #64748b;
+  backdrop-filter: blur(10px);
+}
+
+.favoriteBtn:hover {
+  background: #F24539;
+  color: white;
+  transform: scale(1.1);
+}
+
+.examCardContent {
+  padding: 20px;
+  flex: 1;
+}
+
+.examTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  line-height: 1.3;
+  color: #1e293b;
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: all 0.3s ease;
+}
+
+.examCardContainer:hover .examTitle {
+  background: linear-gradient(135deg, #F24539 0%, #7D5079 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.examDescription {
+  font-size: 1rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.examCardFooter {
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.examStats {
+  display: flex;
+  gap: 16px;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.statItem svg {
+  opacity: 0.7;
+}
+
+.startBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #F24539 0%, #ef4444 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(242, 69, 57, 0.3);
+}
+
+.startBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(242, 69, 57, 0.4);
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.startBtn svg {
+  transition: transform 0.3s ease;
+}
+
+.startBtn:hover svg {
+  transform: translateX(4px);
+}
+
+@media (max-width: 768px) {
+  .examCardContainer {
+    margin: 12px;
+    border-radius: 20px;
+  }
+  
+  .examCardHeader {
+    padding: 16px 16px 0;
+  }
+  
+  .examCardContent {
+    padding: 16px;
+  }
+  
+  .examCardFooter {
+    padding: 0 16px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .examStats {
+    justify-content: center;
+  }
+  
+  .startBtn {
+    width: 100%;
+    justify-content: center;
+  }
+}

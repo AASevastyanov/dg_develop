@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="768" height="768" viewBox="0 0 768 768" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="768" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF4433"/>
+      <stop offset="100%" stop-color="#005BBB"/>
+    </linearGradient>
+  </defs>
+
+  <!-- рамка -->
+  <path d="M384 40 L680 192 V576 L384 728 L88 576 V192 Z"
+        fill="none"
+        stroke="url(#grad)"
+        stroke-width="60"
+        stroke-linejoin="round"
+        stroke-linecap="round"/>
+
+  <!-- текст -->
+  <text x="50%" y="340" text-anchor="middle" fill="#333333"
+        font-size="160" font-family="PT Sans, Arial, sans-serif" font-weight="700">Татар</text>
+  <text x="50%" y="500" text-anchor="middle" fill="#333333"
+        font-size="140" font-family="PT Sans, Arial, sans-serif" font-weight="700">теле</text>
+
+  <!-- тюльпан -->
+  <g fill="#A9A9A9">
+    <path d="M384 590 C360 550, 320 550, 304 588
+             C288 626, 320 656, 344 620
+             C368 648, 400 648, 424 620
+             C448 656, 480 626, 464 588
+             C448 550, 408 550, 384 590Z"/>
+  </g>
+</svg>

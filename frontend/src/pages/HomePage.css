@@ -1,0 +1,343 @@
+.homepage {
+  min-height: 100vh;
+  background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Hero секция */
+.hero-section {
+  padding: 6rem 2rem 4rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hero-content {
+  margin-bottom: 4rem;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+  color: #1a1a1a;
+  letter-spacing: -0.02em;
+}
+
+.hero-accent {
+  color: #F24539;
+}
+
+.hero-description {
+  font-size: 1.125rem;
+  color: #666666;
+  line-height: 1.5;
+  max-width: 600px;
+  margin: 0 auto 3rem auto;
+  font-weight: 400;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.hero-btn--primary {
+  background: #F24539;
+  color: white;
+}
+
+.hero-btn--primary:hover {
+  background: #e13d2b;
+  transform: translateY(-1px);
+}
+
+.hero-btn--secondary {
+  background: transparent;
+  color: #1a1a1a;
+  border: 1px solid #e5e5e5;
+}
+
+.hero-btn--secondary:hover {
+  background: #f8f8f8;
+  border-color: #d1d1d1;
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 4rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+.stat-item {
+  text-align: center;
+  min-width: 80px;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  color: #888888;
+  font-weight: 400;
+  font-size: 0.875rem;
+}
+
+/* Контентные секции */
+.content-section {
+  padding: 3rem 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  border-top: 1px solid #f0f0f0;
+}
+
+.content-section:first-of-type {
+  border-top: none;
+}
+
+.section-header {
+  margin-bottom: 2rem;
+  text-align: center; /* Центрируем заголовки всех секций */
+}
+
+.section-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
+}
+
+.section-description {
+  font-size: 1rem;
+  color: #666666;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* Сетки карточек */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  justify-items: center; /* Центрируем карточки в grid */
+}
+
+.card-wrapper {
+  opacity: 1;
+  width: 100%;
+  max-width: 350px; /* Ограничиваем максимальную ширину */
+}
+
+/* ИСПРАВЛЕННЫЙ горизонтальный скролл для мероприятий */
+.events-scroll {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 2rem;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  justify-content: center; /* ДОБАВЛЕНО: центрируем мероприятия */
+  flex-wrap: wrap; /* ДОБАВЛЕНО: позволяем перенос на новую строку */
+}
+
+.events-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Если мероприятий меньше, чем помещается в строку, они будут по центру */
+@media (min-width: 1024px) {
+  .events-scroll {
+    justify-content: flex-start; /* На больших экранах возвращаем скролл */
+    flex-wrap: nowrap;
+  }
+}
+
+.event-card-wrapper {
+  min-width: 300px;
+  flex-shrink: 0;
+  text-align: center; /* ДОБАВЛЕНО: центрируем содержимое карточек */
+}
+
+/* Пустые состояния */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  grid-column: 1 / -1;
+}
+
+.empty-icon {
+  color: #d1d1d1;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  color: #888888;
+  font-size: 1rem;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* Кнопки секций */
+.section-footer {
+  text-align: center; /* ИЗМЕНЕНО: центрируем кнопки во всех секциях */
+}
+
+.section-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  color: #F24539;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  border: 1px solid #F24539;
+}
+
+.section-btn:hover {
+  background: #F24539;
+  color: white;
+}
+
+.section-btn svg {
+  transition: transform 0.2s ease;
+  width: 14px;
+  height: 14px;
+}
+
+.section-btn:hover svg {
+  transform: translateX(2px);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 4rem 1rem 3rem;
+  }
+
+  .hero-title {
+    font-size: 2.25rem;
+  }
+
+  .hero-description {
+    font-size: 1rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-btn {
+    min-width: 200px;
+  }
+
+  .hero-stats {
+    gap: 2rem;
+  }
+
+  .content-section {
+    padding: 2rem 1rem;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .events-scroll {
+    gap: 1rem;
+    justify-content: center; /* На мобильных тоже центрируем */
+  }
+
+  .event-card-wrapper {
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-section {
+    padding: 3rem 1rem 2rem;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-stats {
+    gap: 1.5rem;
+  }
+
+  .stat-number {
+    font-size: 1.75rem;
+  }
+
+  .section-title {
+    font-size: 1.375rem;
+  }
+
+  .event-card-wrapper {
+    min-width: 260px;
+  }
+}
+
+/* Убираем анимации для более чистого вида */
+* {
+  animation: none !important;
+  transition-duration: 0.2s !important;
+}
+
+/* Дополнительные стили для чистоты */
+.hero-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.content-section + .content-section {
+  margin-top: 1rem;
+}
+
+/* ДОПОЛНИТЕЛЬНО: центрирование элементов внутри EventCard */
+.event-card-wrapper .event-date,
+.event-card-wrapper .event-title,
+.event-card-wrapper .event-location {
+  text-align: center;
+}
