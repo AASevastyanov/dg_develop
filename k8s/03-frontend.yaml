@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: tatarlang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tatarlang
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: tatarlang
+        tier: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: tatarlang-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: tatarlang-app-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: tatarlang
+spec:
+  selector:
+    app: tatarlang
+    tier: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP

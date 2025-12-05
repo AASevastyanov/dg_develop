@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate
+  namespace: tatarlang
+spec:
+  template:
+    metadata:
+      labels:
+        app: tatarlang
+        job: migrate
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15
+          command:
+            [
+              "sh",
+              "-c",
+              "until pg_isready -h db -p 5432 -U $POSTGRES_USER; do echo 'waiting for db'; sleep 2; done",
+            ]
+          envFrom:
+            - configMapRef:
+                name: tatarlang-app-config
+            - secretRef:
+                name: tatarlang-db-secret
+      containers:
+        - name: backend-migrate
+          image: tatarlang-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: tatarlang-app-config
+            - secretRef:
+                name: tatarlang-db-secret
+            - secretRef:
+                name: tatarlang-celery-secret
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backend-clearsessions
+  namespace: tatarlang
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: tatarlang
+            job: clearsessions
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backend-clearsessions
+              image: tatarlang-backend:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "manage.py", "clearsessions"]
+              envFrom:
+                - configMapRef:
+                    name: tatarlang-app-config
+                - secretRef:
+                    name: tatarlang-db-secret
+                - secretRef:
+                    name: tatarlang-celery-secret

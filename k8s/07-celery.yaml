@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: tatarlang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tatarlang
+      tier: celery-worker
+  template:
+    metadata:
+      labels:
+        app: tatarlang
+        tier: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: tatarlang-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            ["celery", "-A", "tatarlang.celery", "worker", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: tatarlang-app-config
+            - secretRef:
+                name: tatarlang-db-secret
+            - secretRef:
+                name: tatarlang-celery-secret
+            - secretRef:
+                name: tatarlang-rabbitmq-secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: tatarlang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tatarlang
+      tier: celery-beat
+  template:
+    metadata:
+      labels:
+        app: tatarlang
+        tier: celery-beat
+    spec:
+      containers:
+        - name: celery-beat
+          image: tatarlang-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            ["celery", "-A", "tatarlang.celery", "beat", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: tatarlang-app-config
+            - secretRef:
+                name: tatarlang-db-secret
+            - secretRef:
+                name: tatarlang-celery-secret
+            - secretRef:
+                name: tatarlang-rabbitmq-secret
