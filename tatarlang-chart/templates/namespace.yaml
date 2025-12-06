@@ -1,0 +1,9 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+{{- end }}
+

@@ -1,0 +1,81 @@
+{{- if .Values.jobs.migrate.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    job: migrate
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "tatarlang-chart.selectorLabels" . | nindent 8 }}
+        job: migrate
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15
+          command:
+            [
+              "sh",
+              "-c",
+              "until pg_isready -h db -p 5432 -U $POSTGRES_USER; do echo 'waiting for db'; sleep 2; done",
+            ]
+          envFrom:
+            - configMapRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+      containers:
+        - name: backend-migrate
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
+{{- end }}
+---
+{{- if .Values.jobs.clearsessions.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backend-clearsessions
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    job: clearsessions
+spec:
+  schedule: {{ .Values.jobs.clearsessions.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "tatarlang-chart.selectorLabels" . | nindent 12 }}
+            job: clearsessions
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backend-clearsessions
+              image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+              imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+              command: ["python", "manage.py", "clearsessions"]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "tatarlang-chart.fullname" . }}-app-config
+                - secretRef:
+                    name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+                - secretRef:
+                    name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
+{{- end }}
+

@@ -1,0 +1,68 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    tier: db
+spec:
+  serviceName: db
+  replicas: {{ .Values.postgresql.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tatarlang-chart.selectorLabels" . | nindent 6 }}
+      tier: db
+  template:
+    metadata:
+      labels:
+        {{- include "tatarlang-chart.selectorLabels" . | nindent 8 }}
+        tier: db
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.postgresql.service.port }}
+              name: db
+          envFrom:
+            - configMapRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+          {{- if and .Values.postgresql.persistence.enabled }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          {{- end }}
+          {{- if .Values.postgresql.resources }}
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          {{- end }}
+      {{- if and .Values.postgresql.persistence.enabled }}
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "tatarlang-chart.fullname" . }}-postgres-pvc
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    tier: db
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ .Values.postgresql.service.port }}
+      targetPort: {{ .Values.postgresql.service.port }}
+      name: db
+  selector:
+    {{- include "tatarlang-chart.selectorLabels" . | nindent 4 }}
+    tier: db
+{{- end }}
+

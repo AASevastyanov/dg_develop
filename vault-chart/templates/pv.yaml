@@ -1,0 +1,34 @@
+{{- if and .Values.vault.enabled .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "vault-chart.fullname" . }}-pv
+  labels:
+    {{- include "vault-chart.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.persistence.size }}
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  hostPath:
+    path: /data/vault
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vault-chart.fullname" . }}-pvc
+  namespace: {{ include "vault-chart.namespace" . }}
+  labels:
+    {{- include "vault-chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  volumeName: {{ include "vault-chart.fullname" . }}-pv
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+{{- end }}
+

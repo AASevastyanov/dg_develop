@@ -1,0 +1,78 @@
+# Default values for vault-chart
+
+global:
+  namespace: vault
+  appName: vault
+
+# Namespace configuration
+namespace:
+  create: true
+  name: vault
+
+# Vault configuration
+vault:
+  enabled: true
+  image:
+    repository: hashicorp/vault
+    tag: "1.15.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8200
+  ui:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    type: file
+    path: /vault/data
+  config:
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_disable: "true"
+    storage:
+      file:
+        path: "/vault/data"
+    ui: "true"
+    api_addr: "http://vault:8200"
+    cluster_addr: "http://vault:8200"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: vault.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: vault
+          servicePort: 8200
+  tls:
+    - secretName: vault-tls
+      hosts:
+        - vault.local
+
+# Service account
+serviceAccount:
+  create: true
+  name: vault
+
+# Persistent volume
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+

@@ -1,0 +1,13 @@
+{{- if .Values.externalServices.smtp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-smtp
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.externalServices.smtp.externalName }}
+{{- end }}
+

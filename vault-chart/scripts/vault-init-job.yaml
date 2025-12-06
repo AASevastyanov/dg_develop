@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+spec:
+  template:
+    spec:
+      containers:
+      - name: vault-init
+        image: hashicorp/vault:1.15.0
+        command:
+        - sh
+        - -c
+        - |
+          export VAULT_ADDR=http://vault-vault-chart.vault.svc.cluster.local:8200
+          echo "Waiting for Vault to be accessible..."
+          for i in {1..30}; do
+            if curl -s $VAULT_ADDR/v1/sys/health > /dev/null 2>&1; then
+              echo "Vault is accessible"
+              break
+            fi
+            echo "Attempt $i/30..."
+            sleep 2
+          done
+          
+          echo "Initializing Vault..."
+          vault operator init -format=json > /tmp/vault-init.json 2>&1 || {
+            if grep -q "already initialized" /tmp/vault-init.json; then
+              echo "Vault already initialized"
+              exit 0
+            fi
+            cat /tmp/vault-init.json
+            exit 1
+          }
+          
+          # Extract values using sed (more reliable)
+          ROOT_TOKEN=$(sed -n 's/.*"root_token":"\([^"]*\)".*/\1/p' /tmp/vault-init.json | head -1)
+          UNSEAL_KEY_1=$(sed -n 's/.*"unseal_keys_b64":\["\([^"]*\)".*/\1/p' /tmp/vault-init.json | head -1)
+          UNSEAL_KEY_2=$(sed -n 's/.*"unseal_keys_b64":\["[^"]*","\([^"]*\)".*/\1/p' /tmp/vault-init.json | head -1)
+          UNSEAL_KEY_3=$(sed -n 's/.*"unseal_keys_b64":\["[^"]*","[^"]*","\([^"]*\)".*/\1/p' /tmp/vault-init.json | head -1)
+          
+          echo "Unsealing Vault with key 1..."
+          echo "$UNSEAL_KEY_1" | vault operator unseal - || vault operator unseal "$UNSEAL_KEY_1"
+          echo "Unsealing Vault with key 2..."
+          echo "$UNSEAL_KEY_2" | vault operator unseal - || vault operator unseal "$UNSEAL_KEY_2"
+          echo "Unsealing Vault with key 3..."
+          echo "$UNSEAL_KEY_3" | vault operator unseal - || vault operator unseal "$UNSEAL_KEY_3"
+          
+          echo ""
+          echo "=== VAULT INITIALIZED ==="
+          echo "Root token: $ROOT_TOKEN"
+          echo "Unseal key 1: $UNSEAL_KEY_1"
+          echo "Unseal key 2: $UNSEAL_KEY_2"
+          echo "Unseal key 3: $UNSEAL_KEY_3"
+          echo "========================="
+          echo ""
+          echo "Save these values securely!"
+      restartPolicy: Never
+

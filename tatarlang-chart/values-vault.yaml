@@ -1,0 +1,19 @@
+# Values file for Vault integration
+# Use this file when deploying with Vault: helm secrets install -f values-vault.yaml
+
+vault:
+  enabled: true
+  address: "http://vault.vault.svc.cluster.local:8200"
+  roleId: ""  # Will be set from vault-keys/role-id.txt
+  secretId: ""  # Will be set from vault-keys/secret-id.txt
+  path: "secret/data/tatarlang"
+  refs:
+    postgres:
+      user: "ref+vault://secret/tatarlang/db#POSTGRES_USER"
+      password: "ref+vault://secret/tatarlang/db#POSTGRES_PASSWORD"
+    rabbitmq:
+      user: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_USER"
+      password: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_PASS"
+    celery:
+      brokerUrl: "ref+vault://secret/tatarlang/celery#CELERY_BROKER_URL"
+

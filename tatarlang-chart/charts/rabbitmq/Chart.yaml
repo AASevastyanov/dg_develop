@@ -1,0 +1,7 @@
+apiVersion: v2
+name: rabbitmq
+description: RabbitMQ subchart for Tatarlang
+type: application
+version: 0.1.0
+appVersion: "3-management"
+

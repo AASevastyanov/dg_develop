@@ -1,0 +1,25 @@
+{{- if .Values.vault.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vault-chart.fullname" . }}-config
+  namespace: {{ include "vault-chart.namespace" . }}
+  labels:
+    {{- include "vault-chart.labels" . | nindent 4 }}
+data:
+  vault.hcl: |
+    listener "tcp" {
+      address = "{{ .Values.vault.config.listener.tcp.address }}"
+      tls_disable = {{ .Values.vault.config.listener.tcp.tls_disable }}
+    }
+    
+    storage "file" {
+      path = "{{ .Values.vault.config.storage.file.path }}"
+    }
+    
+    ui = {{ .Values.vault.config.ui }}
+    
+    api_addr = "{{ .Values.vault.config.api_addr }}"
+    cluster_addr = "{{ .Values.vault.config.cluster_addr }}"
+{{- end }}
+

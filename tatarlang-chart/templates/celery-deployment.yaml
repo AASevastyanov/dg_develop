@@ -1,0 +1,84 @@
+{{- if .Values.celery.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    tier: celery-worker
+spec:
+  replicas: {{ .Values.celery.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tatarlang-chart.selectorLabels" . | nindent 6 }}
+      tier: celery-worker
+  template:
+    metadata:
+      labels:
+        {{- include "tatarlang-chart.selectorLabels" . | nindent 8 }}
+        tier: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command:
+            ["celery", "-A", "tatarlang.celery", "worker", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-rabbitmq-secret
+          {{- if .Values.celery.worker.resources }}
+          resources:
+            {{- toYaml .Values.celery.worker.resources | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+{{- if .Values.celery.beat.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    tier: celery-beat
+spec:
+  replicas: {{ .Values.celery.beat.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tatarlang-chart.selectorLabels" . | nindent 6 }}
+      tier: celery-beat
+  template:
+    metadata:
+      labels:
+        {{- include "tatarlang-chart.selectorLabels" . | nindent 8 }}
+        tier: celery-beat
+    spec:
+      containers:
+        - name: celery-beat
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command:
+            ["celery", "-A", "tatarlang.celery", "beat", "--loglevel=info"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-db-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-rabbitmq-secret
+          {{- if .Values.celery.beat.resources }}
+          resources:
+            {{- toYaml .Values.celery.beat.resources | nindent 12 }}
+          {{- end }}
+{{- end }}
+

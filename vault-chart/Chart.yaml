@@ -1,0 +1,13 @@
+apiVersion: v2
+name: vault-chart
+description: HashiCorp Vault Helm chart
+type: application
+version: 0.1.0
+appVersion: "1.15.0"
+keywords:
+  - vault
+  - secrets
+  - security
+maintainers:
+  - name: Tatarlang Team
+

@@ -1,0 +1,70 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.namespace | default "default" }}
+  labels:
+    {{- include "rabbitmq.labels" . | nindent 4 }}
+    tier: rabbitmq
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "rabbitmq.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      tier: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "rabbitmq.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        tier: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.amqpPort }}
+              name: amqp
+            - containerPort: {{ .Values.service.httpPort }}
+              name: http
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName | default "tatarlang-rabbitmq-secret" }}
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName | default "tatarlang-rabbitmq-secret" }}
+                  key: RABBITMQ_PASS
+          {{- if .Values.resources }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.namespace | default "default" }}
+  labels:
+    {{- include "rabbitmq.labels" . | nindent 4 }}
+    tier: rabbitmq
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: amqp
+      port: {{ .Values.service.amqpPort }}
+      targetPort: {{ .Values.service.amqpPort }}
+    - name: http
+      port: {{ .Values.service.httpPort }}
+      targetPort: {{ .Values.service.httpPort }}
+  selector:
+    app.kubernetes.io/name: {{ include "rabbitmq.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    tier: rabbitmq
+{{- end }}
+

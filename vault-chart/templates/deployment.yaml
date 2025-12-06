@@ -1,0 +1,81 @@
+{{- if .Values.vault.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vault-chart.fullname" . }}
+  namespace: {{ include "vault-chart.namespace" . }}
+  labels:
+    {{- include "vault-chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.vault.replicas }}
+  selector:
+    matchLabels:
+      {{- include "vault-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vault-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | default (include "vault-chart.fullname" .) }}
+      containers:
+        - name: vault
+          image: "{{ .Values.vault.image.repository }}:{{ .Values.vault.image.tag }}"
+          imagePullPolicy: {{ .Values.vault.image.pullPolicy }}
+          command:
+            - vault
+            - server
+            - -config=/vault/config/vault.hcl
+          ports:
+            - containerPort: {{ .Values.vault.service.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: VAULT_ADDR
+              value: "http://0.0.0.0:8200"
+            - name: VAULT_API_ADDR
+              value: "http://0.0.0.0:8200"
+          volumeMounts:
+            - name: config
+              mountPath: /vault/config
+            - name: data
+              mountPath: /vault/data
+            {{- if .Values.vault.ui.enabled }}
+            - name: ui
+              mountPath: /vault/ui
+            {{- end }}
+          {{- if .Values.vault.resources }}
+          resources:
+            {{- toYaml .Values.vault.resources | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=1&uninitcode=200
+              port: {{ .Values.vault.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=1&uninitcode=200
+              port: {{ .Values.vault.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "vault-chart.fullname" . }}-config
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "vault-chart.fullname" . }}-pvc
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.vault.ui.enabled }}
+        - name: ui
+          emptyDir: {}
+        {{- end }}
+{{- end }}
+
