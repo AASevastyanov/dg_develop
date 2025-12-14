@@ -1,386 +1,533 @@
-# Tatarlang - Инструкция по развертыванию
+# Tatarlang - Инструкция по запуску
 
-Полная пошаговая инструкция по развертыванию приложения Tatarlang с использованием Helm-чартов и Vault для управления секретами.
+Полная инструкция по запуску приложения Tatarlang с использованием Docker и Docker Compose.
 
 ## Содержание
 
-1. [Предварительные требования](#предварительные-требования)
-2. [Локальный запуск через Docker Compose](#локальный-запуск-через-docker-compose)
-3. [Развертывание в Kubernetes с Helm](#развертывание-в-kubernetes-с-helm)
-4. [Настройка Vault для управления секретами](#настройка-vault-для-управления-секретами)
-5. [Интеграция приложения с Vault](#интеграция-приложения-с-vault)
+1. [Установка Docker](#установка-docker)
+2. [Быстрый старт](#быстрый-старт)
+3. [Подробная инструкция](#подробная-инструкция)
+4. [Проверка работы](#проверка-работы)
+5. [Управление приложением](#управление-приложением)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Предварительные требования
+## Установка Docker
 
-### Необходимое ПО
+### macOS
 
-- **Docker** и **Docker Compose** (для локального запуска)
-- **Kubernetes кластер** (minikube, kind, или Docker Desktop с Kubernetes)
-- **Helm 3.0+**
-- **kubectl** (для работы с Kubernetes)
-- **Python 3.10.11** (для локальной разработки backend)
+#### Вариант 1: Docker Desktop (рекомендуется)
 
-### Установка инструментов
+1. Скачайте Docker Desktop с официального сайта: https://www.docker.com/products/docker-desktop/
+2. Установите приложение, перетащив его в папку Applications
+3. Запустите Docker Desktop из Applications
+4. Дождитесь полного запуска (иконка Docker в строке меню перестанет мигать)
 
-#### macOS
-
-```bash
-# Homebrew
-brew install docker docker-compose helm kubectl minikube
-
-# Или установите Docker Desktop, который включает Kubernetes
-```
-
-#### Linux
+#### Вариант 2: Через Homebrew
 
 ```bash
-# Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Helm
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-# kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# Minikube
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
+brew install --cask docker
 ```
+
+После установки запустите Docker Desktop из Applications.
+
+### Linux (Ubuntu/Debian)
+
+```bash
+# Обновление списка пакетов
+sudo apt-get update
+
+# Установка необходимых пакетов
+sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Добавление официального GPG ключа Docker
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Настройка репозитория
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Установка Docker Engine и Docker Compose
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Добавление текущего пользователя в группу docker (чтобы не использовать sudo)
+sudo usermod -aG docker $USER
+
+# Перелогиньтесь или выполните:
+newgrp docker
+```
+
+### Linux (Fedora/RHEL/CentOS)
+
+```bash
+# Установка необходимых пакетов
+sudo dnf install -y dnf-plugins-core
+
+# Добавление репозитория Docker
+sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+
+# Установка Docker Engine и Docker Compose
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Запуск Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Добавление пользователя в группу docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### Windows
+
+1. Скачайте Docker Desktop с официального сайта: https://www.docker.com/products/docker-desktop/
+2. Запустите установщик `Docker Desktop Installer.exe`
+3. Следуйте инструкциям установщика
+4. После установки перезагрузите компьютер
+5. Запустите Docker Desktop из меню Пуск
+6. Дождитесь полного запуска (иконка Docker в системном трее)
+
+**Требования:**
+- Windows 10 64-bit: Pro, Enterprise, or Education (Build 15063 или выше)
+- Windows 11 64-bit: Home или Pro версия 21H2 или выше
+- WSL 2 включен и обновлен
 
 ---
 
-## Локальный запуск через Docker Compose
+## Быстрый старт
 
-### Шаг 1: Подготовка окружения
+### Шаг 1: Клонирование репозитория
 
 ```bash
-# Перейдите в директорию проекта
-cd /path/to/dg_develop
-
-# Создайте .env файл в корне проекта (опционально, если нужны кастомные настройки)
-# По умолчанию используются значения из docker-compose.yaml
+git clone <repository-url>
+cd dg_develop
 ```
 
-### Шаг 2: Запуск всех сервисов
+### Шаг 2: Создание файла .env
+
+Создайте файл `.env` в корне проекта:
 
 ```bash
-# Запуск всех сервисов
+# Для Linux/macOS
+cat > .env << EOF
+POSTGRES_DB=tatarlang
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+RABBITMQ_USER=admin
+RABBITMQ_PASS=admin
+EOF
+```
+
+```powershell
+# Для Windows (PowerShell)
+@"
+POSTGRES_DB=tatarlang
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+RABBITMQ_USER=admin
+RABBITMQ_PASS=admin
+"@ | Out-File -FilePath .env -Encoding utf8
+```
+
+### Шаг 3: Запуск приложения
+
+```bash
 docker-compose up --build
+```
 
-# Или в фоновом режиме
+Или в фоновом режиме:
+
+```bash
 docker-compose up -d --build
 ```
 
-### Шаг 3: Проверка работы
+### Шаг 4: Проверка работы
 
-- **Backend API**: http://127.0.0.1:8000
-- **Frontend**: http://127.0.0.1:3000
-- **API Документация**: 
-  - Swagger: http://127.0.0.1:8000/swagger
-  - ReDoc: http://127.0.0.1:8000/redoc
-- **RabbitMQ Management**: http://127.0.0.1:15672 (admin/admin)
-- **Flower (Celery)**: http://127.0.0.1:5555
+Откройте в браузере:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Документация**: http://localhost:8000/swagger
+- **RabbitMQ Management**: http://localhost:15672 (логин: `admin`, пароль: `admin`)
+- **Flower (Celery)**: http://localhost:5555
 
-### Шаг 4: Остановка
+---
+
+## Подробная инструкция
+
+### Шаг 1: Проверка установки Docker
+
+Убедитесь, что Docker установлен и работает:
 
 ```bash
-# Остановка всех сервисов
-docker-compose down
+docker --version
+docker-compose --version
+```
 
-# Остановка с удалением volumes
+Ожидаемый вывод:
+```
+Docker version 24.x.x, build ...
+Docker Compose version v2.x.x
+```
+
+Проверьте, что Docker запущен:
+
+```bash
+docker ps
+```
+
+Если команда выполняется без ошибок, Docker работает корректно.
+
+### Шаг 2: Подготовка проекта
+
+1. **Перейдите в директорию проекта:**
+
+```bash
+cd /path/to/dg_develop
+```
+
+2. **Создайте файл `.env`** (если его еще нет):
+
+**Linux/macOS:**
+```bash
+cat > .env << 'EOF'
+POSTGRES_DB=tatarlang
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+RABBITMQ_USER=admin
+RABBITMQ_PASS=admin
+EOF
+```
+
+**Windows (PowerShell):**
+```powershell
+@"
+POSTGRES_DB=tatarlang
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+RABBITMQ_USER=admin
+RABBITMQ_PASS=admin
+"@ | Out-File -FilePath .env -Encoding utf8
+```
+
+**Windows (CMD):**
+```cmd
+echo POSTGRES_DB=tatarlang > .env
+echo POSTGRES_USER=postgres >> .env
+echo POSTGRES_PASSWORD=postgres >> .env
+echo RABBITMQ_USER=admin >> .env
+echo RABBITMQ_PASS=admin >> .env
+```
+
+### Шаг 3: Запуск приложения
+
+#### Первый запуск (с пересборкой образов)
+
+```bash
+docker-compose up --build
+```
+
+Эта команда:
+- Соберет Docker-образы для backend и frontend
+- Создаст необходимые volumes
+- Запустит все сервисы
+
+#### Запуск в фоновом режиме
+
+```bash
+docker-compose up -d --build
+```
+
+Флаг `-d` запускает контейнеры в фоновом режиме (detached mode).
+
+#### Последующие запуски (без пересборки)
+
+```bash
+docker-compose up
+```
+
+или
+
+```bash
+docker-compose up -d
+```
+
+### Шаг 4: Выполнение миграций базы данных
+
+После первого запуска выполните миграции:
+
+```bash
+docker-compose exec backend python manage.py migrate
+```
+
+### Шаг 5: Создание суперпользователя (опционально)
+
+Для доступа к админ-панели Django:
+
+```bash
+docker-compose exec backend python manage.py createsuperuser
+```
+
+Следуйте инструкциям для создания учетной записи администратора.
+
+---
+
+## Проверка работы
+
+### Проверка статуса контейнеров
+
+```bash
+docker-compose ps
+```
+
+Все сервисы должны быть в статусе `Up`:
+
+```
+NAME                COMMAND                  STATUS          PORTS
+backend             "python manage.py..."     Up              0.0.0.0:8000->8000/tcp
+db                  "docker-entrypoint..."    Up (healthy)    0.0.0.0:5433->5432/tcp
+frontend            "docker-entrypoint..."    Up              0.0.0.0:3000->3000/tcp
+rabbitmq            "docker-entrypoint..."    Up              0.0.0.0:5672->5672/tcp, 0.0.0.0:15672->15672/tcp
+celery_worker       "celery -A..."           Up
+celery_beat         "celery -A..."           Up
+flower              "celery -A..."           Up              0.0.0.0:5555->5555/tcp
+```
+
+### Проверка логов
+
+Просмотр логов всех сервисов:
+
+```bash
+docker-compose logs
+```
+
+Логи конкретного сервиса:
+
+```bash
+docker-compose logs backend
+docker-compose logs frontend
+docker-compose logs db
+```
+
+Логи в реальном времени:
+
+```bash
+docker-compose logs -f backend
+```
+
+### Проверка доступности сервисов
+
+1. **Frontend**: http://localhost:3000
+2. **Backend API**: http://localhost:8000
+3. **API Документация (Swagger)**: http://localhost:8000/swagger
+4. **API Документация (ReDoc)**: http://localhost:8000/redoc
+5. **RabbitMQ Management**: http://localhost:15672
+   - Логин: `admin`
+   - Пароль: `admin`
+6. **Flower (Celery Monitoring)**: http://localhost:5555
+
+---
+
+## Управление приложением
+
+### Остановка приложения
+
+```bash
+docker-compose stop
+```
+
+Останавливает контейнеры, но не удаляет их.
+
+### Запуск остановленных контейнеров
+
+```bash
+docker-compose start
+```
+
+### Перезапуск приложения
+
+```bash
+docker-compose restart
+```
+
+Перезапуск конкретного сервиса:
+
+```bash
+docker-compose restart backend
+```
+
+### Остановка и удаление контейнеров
+
+```bash
+docker-compose down
+```
+
+### Остановка с удалением volumes (удаление данных БД)
+
+⚠️ **Внимание**: Эта команда удалит все данные из базы данных!
+
+```bash
 docker-compose down -v
 ```
 
----
+### Пересборка образов
 
-## Развертывание в Kubernetes с Helm
-
-### Шаг 1: Запуск Kubernetes кластера
-
-#### Вариант A: Minikube (рекомендуется для локальной разработки)
+Если вы изменили код и нужно пересобрать образы:
 
 ```bash
-# Запуск minikube
-minikube start
-
-# Проверка статуса
-minikube status
-kubectl get nodes
+docker-compose build
 ```
 
-#### Вариант B: Docker Desktop
-
-1. Откройте Docker Desktop
-2. Перейдите в Settings → Kubernetes
-3. Включите "Enable Kubernetes"
-4. Дождитесь запуска кластера
-
-#### Вариант C: Kind
+Или для конкретного сервиса:
 
 ```bash
-# Установка kind
-brew install kind  # macOS
-# или скачайте с https://kind.sigs.k8s.io/
-
-# Создание кластера
-kind create cluster
-
-# Проверка
-kubectl cluster-info
+docker-compose build backend
 ```
 
-### Шаг 2: Проверка Helm-чарта
+### Выполнение команд в контейнерах
+
+Выполнение команды в контейнере backend:
 
 ```bash
-# Перейдите в директорию проекта
-cd /path/to/dg_develop
-
-# Проверка синтаксиса чарта
-cd tatarlang-chart
-helm lint .
-
-# Генерация манифестов (без установки)
-helm template tatarlang .
+docker-compose exec backend python manage.py <command>
 ```
 
-### Шаг 3: Установка приложения
-
+Примеры:
 ```bash
-# Установка чарта
-helm install tatarlang ./tatarlang-chart
+# Миграции
+docker-compose exec backend python manage.py migrate
 
-# Или с указанием namespace
-helm install tatarlang ./tatarlang-chart --namespace tatarlang --create-namespace
+# Создание миграций
+docker-compose exec backend python manage.py makemigrations
 
-# Проверка установки
-helm list
-kubectl get pods -n tatarlang
+# Django shell
+docker-compose exec backend python manage.py shell
+
+# Создание суперпользователя
+docker-compose exec backend python manage.py createsuperuser
 ```
 
-### Шаг 4: Сборка Docker-образов для Minikube
-
-Если используете minikube, нужно собрать образы в контексте minikube:
+Доступ к shell контейнера:
 
 ```bash
-# Настроить Docker для использования minikube
-eval $(minikube docker-env)
-
-# Собрать образы
-cd backend
-docker build -t tatarlang-backend:latest .
-
-cd ../frontend
-docker build -t tatarlang-frontend:latest .
-
-# Вернуться к обычному Docker (опционально)
-eval $(minikube docker-env -u)
-```
-
-### Шаг 5: Проверка работы приложения
-
-```bash
-# Проверить статус подов
-kubectl get pods -n tatarlang
-
-# Проверить сервисы
-kubectl get svc -n tatarlang
-
-# Просмотр логов
-kubectl logs -n tatarlang -l tier=backend
-kubectl logs -n tatarlang -l tier=frontend
-```
-
-### Шаг 6: Обновление приложения
-
-```bash
-# Обновление чарта
-helm upgrade tatarlang ./tatarlang-chart
-
-# С кастомными значениями
-helm upgrade tatarlang ./tatarlang-chart -f my-values.yaml
-```
-
-### Шаг 7: Удаление приложения
-
-```bash
-# Удаление release
-helm uninstall tatarlang
-
-# С удалением namespace
-helm uninstall tatarlang --namespace tatarlang
-kubectl delete namespace tatarlang
+docker-compose exec backend sh
 ```
 
 ---
 
-## Настройка Vault для управления секретами
+## Troubleshooting
 
-### Шаг 1: Установка необходимых инструментов
+### Проблема: Docker не запускается
 
+**macOS/Windows:**
+- Убедитесь, что Docker Desktop запущен
+- Проверьте системные требования
+- Перезапустите Docker Desktop
+
+**Linux:**
 ```bash
-# Установка helm-secrets плагина
-helm plugin install https://github.com/jkroepke/helm-secrets --verify=false
+# Проверка статуса Docker
+sudo systemctl status docker
 
-# Установка vals (для работы с Vault)
-brew install vals  # macOS
-# или скачайте с https://github.com/helmfile/vals/releases
+# Запуск Docker
+sudo systemctl start docker
+
+# Автозапуск при загрузке
+sudo systemctl enable docker
 ```
 
-### Шаг 2: Развертывание Vault
+### Проблема: Порт уже занят
 
+Если порт 8000, 3000 или другой уже занят:
+
+1. Найдите процесс, использующий порт:
+
+**Linux/macOS:**
 ```bash
-# Установка Vault
-helm install vault ./vault-chart --namespace vault --create-namespace --set persistence.enabled=false
-
-# Ожидание готовности (может занять 1-2 минуты)
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault-chart -n vault --timeout=300s
-
-# Проверка статуса
-kubectl get pods -n vault
+lsof -i :8000
+# или
+netstat -tulpn | grep 8000
 ```
 
-### Шаг 3: Инициализация Vault
-
-```bash
-# Получить имя пода Vault
-VAULT_POD=$(kubectl get pod -n vault -l app.kubernetes.io/name=vault-chart --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
-
-# Инициализировать Vault
-kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator init
-
-# ⚠️ ВАЖНО: Сохраните выведенные ключи!
-# Вам понадобятся:
-# - Root Token (один)
-# - Unseal Keys (минимум 3 из 5)
+**Windows:**
+```powershell
+netstat -ano | findstr :8000
 ```
 
-### Шаг 4: Unseal Vault
+2. Остановите процесс или измените порт в `docker-compose.yaml`
+
+### Проблема: Ошибка подключения к базе данных
 
 ```bash
-# Выполните unseal (замените KEY1, KEY2, KEY3 на реальные ключи из предыдущего шага)
-kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY1>
-kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY2>
-kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY3>
+# Проверьте статус контейнера БД
+docker-compose ps db
 
-# Проверка статуса (должно быть Sealed: false)
-kubectl exec -n vault "$VAULT_POD" -c vault -- vault status
+# Проверьте логи БД
+docker-compose logs db
+
+# Перезапустите БД
+docker-compose restart db
 ```
 
-### Шаг 5: Сохранение ключей
+### Проблема: Backend не запускается
 
 ```bash
-# Создать директорию для ключей
-mkdir -p vault-keys
+# Проверьте логи
+docker-compose logs backend
 
-# Сохранить ключи (замените значения на реальные)
-echo "<ROOT_TOKEN>" > vault-keys/root-token.txt
-echo "<KEY1>" > vault-keys/unseal-key-1.txt
-echo "<KEY2>" > vault-keys/unseal-key-2.txt
-echo "<KEY3>" > vault-keys/unseal-key-3.txt
+# Проверьте, что БД запущена
+docker-compose ps db
 
-# ⚠️ ВАЖНО: Не коммитьте эти файлы в git! Они уже в .gitignore
+# Выполните миграции
+docker-compose exec backend python manage.py migrate
 ```
 
-### Шаг 6: Настройка Vault (политики, AppRole, секреты)
+### Проблема: Frontend не компилируется
 
 ```bash
-# Перейти в директорию скриптов
-cd vault-chart/scripts
+# Проверьте логи
+docker-compose logs frontend
 
-# Настроить Vault
-export VAULT_ROOT_TOKEN=$(cat ../../vault-keys/root-token.txt)
-./vault-setup.sh
-
-# Скрипт выполнит:
-# - Включение KV v2 secret engine
-# - Создание политики доступа (tatarlang-policy)
-# - Включение AppRole аутентификации
-# - Создание AppRole (tatarlang-role)
-# - Сохранение секретов в Vault
+# Пересоберите образ frontend
+docker-compose build frontend
+docker-compose up -d frontend
 ```
 
-После выполнения скрипта будут сохранены:
-- `vault-keys/role-id.txt` - Role ID для AppRole
-- `vault-keys/secret-id.txt` - Secret ID для AppRole
-
-### Шаг 7: Проверка секретов в Vault
+### Проблема: Контейнеры постоянно перезапускаются
 
 ```bash
-# Получить имя пода
-VAULT_POD=$(kubectl get pod -n vault -l app.kubernetes.io/name=vault-chart --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+# Проверьте логи всех сервисов
+docker-compose logs
 
-# Получить root token
-ROOT_TOKEN=$(cat vault-keys/root-token.txt)
+# Проверьте использование ресурсов
+docker stats
 
-# Просмотр секретов
-kubectl exec -n vault "$VAULT_POD" -c vault -- \
-  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=$ROOT_TOKEN vault kv list secret/tatarlang"
-
-# Просмотр конкретного секрета
-kubectl exec -n vault "$VAULT_POD" -c vault -- \
-  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=$ROOT_TOKEN vault kv get secret/tatarlang/db"
+# Увеличьте лимиты ресурсов в docker-compose.yaml или Docker Desktop
 ```
 
----
+### Очистка системы Docker
 
-## Интеграция приложения с Vault
-
-### Шаг 1: Настройка переменных окружения для vals
+Если возникли проблемы, можно очистить систему:
 
 ```bash
-# Установить переменные окружения для работы с Vault
-export VAULT_ADDR=http://vault-vault-chart.vault.svc.cluster.local:8200
-export VAULT_ROLE_ID=$(cat vault-keys/role-id.txt)
-export VAULT_SECRET_ID=$(cat vault-keys/secret-id.txt)
-```
+# Остановка всех контейнеров
+docker-compose down
 
-### Шаг 2: Переустановка приложения с Vault интеграцией
+# Удаление неиспользуемых образов
+docker image prune -a
 
-```bash
-# Удалить текущую установку (если есть)
-helm uninstall tatarlang --namespace tatarlang
+# Удаление неиспользуемых volumes
+docker volume prune
 
-# Установить с Vault интеграцией
-# Вариант 1: Используя helm-secrets (если настроен)
-helm secrets install tatarlang ./tatarlang-chart \
-  --namespace tatarlang \
-  --create-namespace \
-  -f tatarlang-chart/values-vault.yaml
-
-# Вариант 2: Используя vals напрямую
-vals eval -f tatarlang-chart/values-vault.yaml | \
-  helm install tatarlang ./tatarlang-chart \
-  --namespace tatarlang \
-  --create-namespace \
-  -f -
-
-# Вариант 3: Без Vault (используя обычные секреты)
-helm install tatarlang ./tatarlang-chart \
-  --namespace tatarlang \
-  --create-namespace \
-  --set vault.enabled=false
-```
-
-### Шаг 3: Проверка работы
-
-```bash
-# Проверить статус подов
-kubectl get pods -n tatarlang
-
-# Проверить секреты
-kubectl get secrets -n tatarlang
-
-# Проверить логи приложения
-kubectl logs -n tatarlang -l tier=backend
+# Полная очистка (осторожно!)
+docker system prune -a --volumes
 ```
 
 ---
@@ -390,166 +537,16 @@ kubectl logs -n tatarlang -l tier=backend
 ```
 dg_develop/
 ├── backend/                 # Django backend приложение
+│   ├── tatarlang/          # Основное приложение
+│   ├── manage.py           # Django management script
+│   └── Dockerfile          # Docker образ для backend
 ├── frontend/                # React frontend приложение
-├── k8s/                     # Оригинальные Kubernetes манифесты
-├── tatarlang-chart/         # Helm-чарт приложения
-│   ├── charts/              # Subcharts (postgresql, rabbitmq)
-│   ├── templates/           # Helm шаблоны
-│   ├── scripts/             # Скрипты валидации
-│   ├── Chart.yaml
-│   ├── values.yaml          # Значения по умолчанию
-│   └── values-vault.yaml    # Значения для Vault интеграции
-├── vault-chart/             # Helm-чарт Vault
-│   ├── templates/
-│   ├── scripts/             # Скрипты инициализации Vault
-│   ├── Chart.yaml
-│   └── values.yaml
-├── vault-keys/              # Ключи Vault (не в git!)
-│   ├── root-token.txt
-│   ├── unseal-key-*.txt
-│   ├── role-id.txt
-│   └── secret-id.txt
-├── scripts/
-│   └── deploy.sh           # Скрипт автоматического деплоя
-├── docker-compose.yaml      # Docker Compose конфигурация
-├── env-example              # Пример env файла с vault refs
-└── README.md               # Этот файл
-```
-
----
-
-## Полезные команды
-
-### Kubernetes
-
-```bash
-# Просмотр всех ресурсов
-kubectl get all -n tatarlang
-
-# Просмотр логов
-kubectl logs -n tatarlang <pod-name>
-kubectl logs -n tatarlang -l tier=backend --tail=100
-
-# Подключение к поду
-kubectl exec -it -n tatarlang <pod-name> -- /bin/sh
-
-# Описание ресурса
-kubectl describe pod -n tatarlang <pod-name>
-
-# Просмотр событий
-kubectl get events -n tatarlang --sort-by='.lastTimestamp'
-```
-
-### Vault
-
-```bash
-# Статус Vault
-kubectl exec -n vault <vault-pod> -c vault -- vault status
-
-# Unseal после перезапуска
-kubectl exec -n vault <vault-pod> -c vault -- vault operator unseal <KEY>
-
-# Просмотр политик
-kubectl exec -n vault <vault-pod> -c vault -- \
-  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=<ROOT_TOKEN> vault policy list"
-
-# Просмотр AppRole
-kubectl exec -n vault <vault-pod> -c vault -- \
-  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=<ROOT_TOKEN> vault list auth/approle/role"
-```
-
-### Helm
-
-```bash
-# Список установленных release
-helm list -A
-
-# История изменений
-helm history tatarlang
-
-# Откат к предыдущей версии
-helm rollback tatarlang <revision-number>
-
-# Просмотр значений
-helm get values tatarlang
-```
-
----
-
-## Troubleshooting
-
-### Проблема: Minikube не запускается (API server не стартует)
-
-**Симптомы:**
-- Ошибки типа `K8S_APISERVER_MISSING: wait 6m0s for node: wait for apiserver proc: apiserver process never appeared`
-- Ошибки `connection refused` при попытке подключиться к API server
-- Addons не могут примениться из-за недоступности API server
-
-**Решение:**
-```bash
-# Вариант 1: Остановить и перезапустить minikube
-minikube stop
-minikube start
-
-# Вариант 2: Если не помогло - удалить и пересоздать кластер
-minikube delete
-minikube start --driver=docker
-
-# Вариант 3: Проверить статус Docker
-docker ps  # Убедитесь, что Docker работает
-
-# Вариант 4: Запуск с явным указанием драйвера и дополнительными ресурсами
-minikube delete
-minikube start --driver=docker --memory=4096 --cpus=2
-```
-
-**Проверка после запуска:**
-```bash
-minikube status  # Все компоненты должны быть Running
-kubectl get nodes  # Узел должен быть Ready
-```
-
-### Проблема: Поды не запускаются (ImagePullBackOff)
-
-**Решение:**
-```bash
-# Для minikube - собрать образы в контексте minikube
-eval $(minikube docker-env)
-docker build -t tatarlang-backend:latest ./backend
-docker build -t tatarlang-frontend:latest ./frontend
-```
-
-### Проблема: Vault не отвечает
-
-**Решение:**
-```bash
-# Проверить логи
-kubectl logs -n vault -l app.kubernetes.io/name=vault-chart
-
-# Проверить статус
-kubectl exec -n vault <vault-pod> -c vault -- vault status
-
-# Если Sealed: true - выполнить unseal
-```
-
-### Проблема: helm-secrets не работает
-
-**Решение:**
-```bash
-# Переустановить плагин
-helm plugin uninstall secrets
-helm plugin install https://github.com/jkroepke/helm-secrets --verify=false
-
-# Или использовать vals напрямую
-vals eval -f values-vault.yaml | helm install ...
-```
-
-### Проблема: Namespace не удаляется
-
-**Решение:**
-```bash
-# Принудительное удаление
-kubectl delete namespace <namespace> --force --grace-period=0
+│   ├── src/                # Исходный код
+│   ├── public/             # Статические файлы
+│   └── Dockerfile          # Docker образ для frontend
+├── docker-compose.yaml     # Конфигурация Docker Compose
+├── .env                    # Переменные окружения (создается вручную)
+└── README.md              # Этот файл
 ```
 
 ---
@@ -558,26 +555,44 @@ kubectl delete namespace <namespace> --force --grace-period=0
 
 ### Переменные окружения
 
-Пример файла `env-example` с vault refs:
+Основные переменные в файле `.env`:
+
+- `POSTGRES_DB` - имя базы данных PostgreSQL
+- `POSTGRES_USER` - пользователь PostgreSQL
+- `POSTGRES_PASSWORD` - пароль PostgreSQL
+- `RABBITMQ_USER` - пользователь RabbitMQ
+- `RABBITMQ_PASS` - пароль RabbitMQ
+
+### Полезные команды Docker
+
+```bash
+# Просмотр всех контейнеров
+docker ps -a
+
+# Просмотр всех образов
+docker images
+
+# Просмотр volumes
+docker volume ls
+
+# Просмотр сетей
+docker network ls
+
+# Использование ресурсов
+docker stats
 ```
-VAULT_ADDR=http://vault.vault.svc.cluster.local:8200
-POSTGRES_USER=ref+vault://secret/tatarlang/db#POSTGRES_USER
-POSTGRES_PASSWORD=ref+vault://secret/tatarlang/db#POSTGRES_PASSWORD
-```
 
-### Безопасность
+---
 
-- ⚠️ **Никогда не коммитьте ключи Vault в git!**
-- ⚠️ Храните `vault-keys/` в безопасном месте
-- ⚠️ Используйте разные ключи для разных окружений
-- ⚠️ Регулярно ротируйте секреты
-
-### Поддержка
+## Поддержка
 
 При возникновении проблем:
-1. Проверьте логи: `kubectl logs -n <namespace> <pod-name>`
-2. Проверьте статус ресурсов: `kubectl get all -n <namespace>`
-3. Проверьте события: `kubectl get events -n <namespace>`
+
+1. Проверьте логи: `docker-compose logs`
+2. Проверьте статус контейнеров: `docker-compose ps`
+3. Убедитесь, что все порты свободны
+4. Проверьте, что Docker Desktop запущен (macOS/Windows)
+5. Проверьте системные требования
 
 ---
 
