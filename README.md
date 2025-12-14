@@ -478,6 +478,37 @@ helm get values tatarlang
 
 ## Troubleshooting
 
+### Проблема: Minikube не запускается (API server не стартует)
+
+**Симптомы:**
+- Ошибки типа `K8S_APISERVER_MISSING: wait 6m0s for node: wait for apiserver proc: apiserver process never appeared`
+- Ошибки `connection refused` при попытке подключиться к API server
+- Addons не могут примениться из-за недоступности API server
+
+**Решение:**
+```bash
+# Вариант 1: Остановить и перезапустить minikube
+minikube stop
+minikube start
+
+# Вариант 2: Если не помогло - удалить и пересоздать кластер
+minikube delete
+minikube start --driver=docker
+
+# Вариант 3: Проверить статус Docker
+docker ps  # Убедитесь, что Docker работает
+
+# Вариант 4: Запуск с явным указанием драйвера и дополнительными ресурсами
+minikube delete
+minikube start --driver=docker --memory=4096 --cpus=2
+```
+
+**Проверка после запуска:**
+```bash
+minikube status  # Все компоненты должны быть Running
+kubectl get nodes  # Узел должен быть Ready
+```
+
 ### Проблема: Поды не запускаются (ImagePullBackOff)
 
 **Решение:**

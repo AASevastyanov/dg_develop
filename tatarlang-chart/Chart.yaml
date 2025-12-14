@@ -13,3 +13,13 @@ maintainers:
 # Note: Subcharts are located in charts/ directory
 # They can be used as dependencies or as standalone charts
 
+dependencies:
+  - name: postgresql
+    version: 0.1.0
+    repository: "file://charts/postgresql"
+    condition: postgresql.enabled
+  - name: rabbitmq
+    version: 0.1.0
+    repository: "file://charts/rabbitmq"
+    condition: rabbitmq.enabled
+
