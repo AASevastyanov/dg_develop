@@ -10,6 +10,9 @@
 4. [Проверка работы](#проверка-работы)
 5. [Управление приложением](#управление-приложением)
 6. [Troubleshooting](#troubleshooting)
+7. [Развертывание в Kubernetes с Helm](#развертывание-в-kubernetes-с-helm)
+8. [Настройка Vault для управления секретами](#настройка-vault-для-управления-секретами)
+9. [Интеграция приложения с Vault](#интеграция-приложения-с-vault)
 
 ---
 
@@ -580,6 +583,539 @@ docker network ls
 
 # Использование ресурсов
 docker stats
+```
+
+---
+
+## Развертывание в Kubernetes с Helm
+
+Этот раздел описывает развертывание приложения в Kubernetes кластере с использованием Helm-чартов.
+
+### Предварительные требования
+
+- **Kubernetes кластер** (minikube, kind, или Docker Desktop с Kubernetes)
+- **Helm 3.0+**
+- **kubectl** (для работы с Kubernetes)
+
+### Установка инструментов
+
+#### macOS
+
+```bash
+# Homebrew
+brew install helm kubectl minikube
+```
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+# Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+# Minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+```
+
+#### Windows
+
+1. Установите Helm: https://helm.sh/docs/intro/install/
+2. Установите kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/
+3. Установите Minikube: https://minikube.sigs.k8s.io/docs/start/
+
+### Шаг 1: Запуск Kubernetes кластера
+
+#### Вариант A: Minikube (рекомендуется для локальной разработки)
+
+```bash
+# Запуск minikube
+minikube start
+
+# Проверка статуса
+minikube status
+kubectl get nodes
+```
+
+Если возникли проблемы с запуском:
+
+```bash
+# Удалить и пересоздать кластер
+minikube delete
+minikube start --driver=docker
+```
+
+#### Вариант B: Docker Desktop
+
+1. Откройте Docker Desktop
+2. Перейдите в Settings → Kubernetes
+3. Включите "Enable Kubernetes"
+4. Дождитесь запуска кластера (может занять несколько минут)
+
+#### Вариант C: Kind
+
+```bash
+# Установка kind
+brew install kind  # macOS
+# или скачайте с https://kind.sigs.k8s.io/
+
+# Создание кластера
+kind create cluster
+
+# Проверка
+kubectl cluster-info
+```
+
+### Шаг 2: Проверка Helm-чарта
+
+```bash
+# Перейдите в директорию проекта
+cd /path/to/dg_develop
+
+# Проверка синтаксиса чарта
+cd tatarlang-chart
+helm lint .
+
+# Генерация манифестов (без установки)
+helm template tatarlang .
+```
+
+### Шаг 3: Сборка Docker-образов для Minikube
+
+Если используете minikube, нужно собрать образы в контексте minikube:
+
+```bash
+# Настроить Docker для использования minikube
+eval $(minikube docker-env)
+
+# Собрать образы
+cd backend
+docker build -t tatarlang-backend:latest .
+
+cd ../frontend
+docker build -t tatarlang-frontend:latest .
+
+# Вернуться к обычному Docker (опционально)
+eval $(minikube docker-env -u)
+```
+
+**Примечание**: Если используете Docker Desktop с Kubernetes, образы можно собрать обычным способом, но нужно убедиться, что они доступны в кластере.
+
+### Шаг 4: Установка приложения
+
+```bash
+# Установка чарта с указанием namespace
+helm install tatarlang ./tatarlang-chart \
+  --namespace tatarlang \
+  --create-namespace \
+  --set vault.enabled=false
+
+# Проверка установки
+helm list -n tatarlang
+kubectl get pods -n tatarlang
+```
+
+### Шаг 5: Проверка работы приложения
+
+```bash
+# Проверить статус подов
+kubectl get pods -n tatarlang
+
+# Проверить сервисы
+kubectl get svc -n tatarlang
+
+# Просмотр логов
+kubectl logs -n tatarlang -l tier=backend
+kubectl logs -n tatarlang -l tier=frontend
+
+# Получить доступ к приложению через port-forward
+kubectl port-forward -n tatarlang svc/backend 8000:8000
+kubectl port-forward -n tatarlang svc/frontend 3000:3000
+```
+
+После этого приложение будет доступно:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+
+### Шаг 6: Обновление приложения
+
+```bash
+# Обновление чарта
+helm upgrade tatarlang ./tatarlang-chart -n tatarlang
+
+# С кастомными значениями
+helm upgrade tatarlang ./tatarlang-chart -n tatarlang -f my-values.yaml
+```
+
+### Шаг 7: Удаление приложения
+
+```bash
+# Удаление release
+helm uninstall tatarlang -n tatarlang
+
+# С удалением namespace
+kubectl delete namespace tatarlang
+```
+
+### Troubleshooting Kubernetes/Helm
+
+#### Проблема: Minikube не запускается (API server не стартует)
+
+**Симптомы:**
+- Ошибки типа `K8S_APISERVER_MISSING: wait 6m0s for node: wait for apiserver proc: apiserver process never appeared`
+- Ошибки `connection refused` при попытке подключиться к API server
+
+**Решение:**
+```bash
+# Вариант 1: Остановить и перезапустить minikube
+minikube stop
+minikube start
+
+# Вариант 2: Если не помогло - удалить и пересоздать кластер
+minikube delete
+minikube start --driver=docker
+
+# Вариант 3: Проверить статус Docker
+docker ps  # Убедитесь, что Docker работает
+
+# Вариант 4: Запуск с явным указанием драйвера и дополнительными ресурсами
+minikube delete
+minikube start --driver=docker --memory=4096 --cpus=2
+```
+
+**Проверка после запуска:**
+```bash
+minikube status  # Все компоненты должны быть Running
+kubectl get nodes  # Узел должен быть Ready
+```
+
+#### Проблема: Поды не запускаются (ImagePullBackOff)
+
+**Решение:**
+```bash
+# Для minikube - собрать образы в контексте minikube
+eval $(minikube docker-env)
+docker build -t tatarlang-backend:latest ./backend
+docker build -t tatarlang-frontend:latest ./frontend
+eval $(minikube docker-env -u)
+```
+
+#### Проблема: Backend не может подключиться к БД
+
+**Решение:**
+```bash
+# Проверить, что сервис БД существует
+kubectl get svc -n tatarlang | grep db
+
+# Проверить логи backend
+kubectl logs -n tatarlang -l tier=backend
+
+# Проверить, что БД запущена
+kubectl get pods -n tatarlang | grep db
+
+# Проверить переменные окружения
+kubectl exec -n tatarlang <backend-pod> -- env | grep POSTGRES
+```
+
+#### Проблема: Namespace не удаляется
+
+**Решение:**
+```bash
+# Принудительное удаление
+kubectl delete namespace <namespace> --force --grace-period=0
+```
+
+#### Полезные команды Kubernetes
+
+```bash
+# Просмотр всех ресурсов
+kubectl get all -n tatarlang
+
+# Просмотр логов
+kubectl logs -n tatarlang <pod-name>
+kubectl logs -n tatarlang -l tier=backend --tail=100
+
+# Подключение к поду
+kubectl exec -it -n tatarlang <pod-name> -- /bin/sh
+
+# Описание ресурса
+kubectl describe pod -n tatarlang <pod-name>
+
+# Просмотр событий
+kubectl get events -n tatarlang --sort-by='.lastTimestamp'
+
+# Просмотр истории Helm release
+helm history tatarlang -n tatarlang
+
+# Откат к предыдущей версии
+helm rollback tatarlang <revision-number> -n tatarlang
+```
+
+---
+
+## Настройка Vault для управления секретами
+
+Vault используется для безопасного хранения и управления секретами приложения (пароли БД, ключи API и т.д.).
+
+### Предварительные требования
+
+- Работающий Kubernetes кластер
+- Helm 3.0+
+- kubectl
+
+### Шаг 1: Установка необходимых инструментов
+
+```bash
+# Установка helm-secrets плагина
+helm plugin install https://github.com/jkroepke/helm-secrets --verify=false
+
+# Установка vals (для работы с Vault)
+# macOS
+brew install vals
+
+# Linux
+curl -LO https://github.com/helmfile/vals/releases/latest/download/vals_linux_amd64.tar.gz
+tar -xzf vals_linux_amd64.tar.gz
+sudo mv vals /usr/local/bin/
+
+# Windows
+# Скачайте с https://github.com/helmfile/vals/releases
+```
+
+### Шаг 2: Развертывание Vault
+
+```bash
+# Перейдите в директорию проекта
+cd /path/to/dg_develop
+
+# Установка Vault
+helm install vault ./vault-chart \
+  --namespace vault \
+  --create-namespace \
+  --set persistence.enabled=false
+
+# Ожидание готовности (может занять 1-2 минуты)
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault-chart -n vault --timeout=300s
+
+# Проверка статуса
+kubectl get pods -n vault
+```
+
+### Шаг 3: Инициализация Vault
+
+```bash
+# Получить имя пода Vault
+VAULT_POD=$(kubectl get pod -n vault -l app.kubernetes.io/name=vault-chart \
+  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+# Инициализировать Vault
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator init
+
+# ⚠️ ВАЖНО: Сохраните выведенные ключи!
+# Вам понадобятся:
+# - Root Token (один)
+# - Unseal Keys (минимум 3 из 5)
+```
+
+**Пример вывода:**
+```
+Unseal Key 1: abc123...
+Unseal Key 2: def456...
+Unseal Key 3: ghi789...
+Unseal Key 4: jkl012...
+Unseal Key 5: mno345...
+
+Initial Root Token: s.xyz789...
+```
+
+### Шаг 4: Распечатывание Vault (Unseal)
+
+Vault по умолчанию запечатан (sealed) для безопасности. Нужно распечатать его:
+
+```bash
+# Выполните unseal (замените KEY1, KEY2, KEY3 на реальные ключи)
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY1>
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY2>
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal <KEY3>
+
+# Проверка статуса (должно быть Sealed: false)
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault status
+```
+
+### Шаг 5: Сохранение ключей
+
+```bash
+# Создать директорию для ключей
+mkdir -p vault-keys
+
+# Сохранить ключи (замените значения на реальные)
+echo "<ROOT_TOKEN>" > vault-keys/root-token.txt
+echo "<KEY1>" > vault-keys/unseal-key-1.txt
+echo "<KEY2>" > vault-keys/unseal-key-2.txt
+echo "<KEY3>" > vault-keys/unseal-key-3.txt
+
+# ⚠️ ВАЖНО: Не коммитьте эти файлы в git! Они уже в .gitignore
+```
+
+### Шаг 6: Настройка Vault (политики, AppRole, секреты)
+
+```bash
+# Перейти в директорию скриптов
+cd vault-chart/scripts
+
+# Настроить Vault
+export VAULT_ROOT_TOKEN=$(cat ../../vault-keys/root-token.txt)
+./vault-setup.sh
+```
+
+Скрипт выполнит:
+- Включение KV v2 secret engine
+- Создание политики доступа (tatarlang-policy)
+- Включение AppRole аутентификации
+- Создание AppRole (tatarlang-role)
+- Сохранение секретов в Vault
+
+После выполнения скрипта будут сохранены:
+- `vault-keys/role-id.txt` - Role ID для AppRole
+- `vault-keys/secret-id.txt` - Secret ID для AppRole
+
+### Шаг 7: Проверка секретов в Vault
+
+```bash
+# Получить имя пода
+VAULT_POD=$(kubectl get pod -n vault -l app.kubernetes.io/name=vault-chart \
+  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+# Получить root token
+ROOT_TOKEN=$(cat vault-keys/root-token.txt)
+
+# Просмотр секретов
+kubectl exec -n vault "$VAULT_POD" -c vault -- \
+  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=$ROOT_TOKEN vault kv list secret/tatarlang"
+
+# Просмотр конкретного секрета
+kubectl exec -n vault "$VAULT_POD" -c vault -- \
+  sh -c "VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=$ROOT_TOKEN vault kv get secret/tatarlang/db"
+```
+
+### Важные замечания
+
+1. **Vault запечатывается при перезапуске**: После перезапуска пода Vault нужно снова выполнить unseal
+2. **Автоматический unseal**: Для продакшена рекомендуется настроить автоматический unseal (AWS KMS, Azure Key Vault и т.д.)
+3. **Безопасность ключей**: Никогда не коммитьте ключи Vault в git!
+
+---
+
+## Интеграция приложения с Vault
+
+После настройки Vault можно интегрировать его с приложением для автоматического получения секретов.
+
+### Шаг 1: Настройка переменных окружения для vals
+
+```bash
+# Установить переменные окружения для работы с Vault
+export VAULT_ADDR=http://vault-vault-chart.vault.svc.cluster.local:8200
+export VAULT_ROLE_ID=$(cat vault-keys/role-id.txt)
+export VAULT_SECRET_ID=$(cat vault-keys/secret-id.txt)
+```
+
+### Шаг 2: Переустановка приложения с Vault интеграцией
+
+```bash
+# Удалить текущую установку (если есть)
+helm uninstall tatarlang --namespace tatarlang
+
+# Установить с Vault интеграцией
+# Вариант 1: Используя helm-secrets
+helm secrets install tatarlang ./tatarlang-chart \
+  --namespace tatarlang \
+  --create-namespace \
+  -f tatarlang-chart/values-vault.yaml
+
+# Вариант 2: Используя vals напрямую
+vals eval -f tatarlang-chart/values-vault.yaml | \
+  helm install tatarlang ./tatarlang-chart \
+  --namespace tatarlang \
+  --create-namespace \
+  -f -
+
+# Вариант 3: Без Vault (используя обычные секреты)
+helm install tatarlang ./tatarlang-chart \
+  --namespace tatarlang \
+  --create-namespace \
+  --set vault.enabled=false
+```
+
+### Шаг 3: Проверка работы
+
+```bash
+# Проверить статус подов
+kubectl get pods -n tatarlang
+
+# Проверить секреты
+kubectl get secrets -n tatarlang
+
+# Проверить логи приложения
+kubectl logs -n tatarlang -l tier=backend
+```
+
+### Формат ссылок на секреты в Vault
+
+В файле `values-vault.yaml` используются ссылки на секреты в формате:
+
+```yaml
+secrets:
+  postgres:
+    user: "ref+vault://secret/tatarlang/db#POSTGRES_USER"
+    password: "ref+vault://secret/tatarlang/db#POSTGRES_PASSWORD"
+  rabbitmq:
+    user: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_USER"
+    password: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_PASS"
+```
+
+### Troubleshooting Vault
+
+#### Проблема: Vault не отвечает
+
+```bash
+# Проверить логи
+kubectl logs -n vault -l app.kubernetes.io/name=vault-chart
+
+# Проверить статус
+kubectl exec -n vault <vault-pod> -c vault -- vault status
+
+# Если Sealed: true - выполнить unseal
+```
+
+#### Проблема: Vault запечатан после перезапуска
+
+```bash
+# Получить ключи unseal
+KEY1=$(cat vault-keys/unseal-key-1.txt)
+KEY2=$(cat vault-keys/unseal-key-2.txt)
+KEY3=$(cat vault-keys/unseal-key-3.txt)
+
+# Выполнить unseal
+VAULT_POD=$(kubectl get pod -n vault -l app.kubernetes.io/name=vault-chart \
+  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal "$KEY1"
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal "$KEY2"
+kubectl exec -n vault "$VAULT_POD" -c vault -- vault operator unseal "$KEY3"
+```
+
+#### Проблема: helm-secrets не работает
+
+```bash
+# Переустановить плагин
+helm plugin uninstall secrets
+helm plugin install https://github.com/jkroepke/helm-secrets --verify=false
+
+# Или использовать vals напрямую
+vals eval -f values-vault.yaml | helm install ...
 ```
 
 ---
