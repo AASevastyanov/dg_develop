@@ -67,6 +67,19 @@ path \"secret/metadata/tatarlang/*\" {
 }
 EOF" || echo "Warning: Failed to create policy (may already exist)"
 
+# Create policy for API keys (if not exists)
+echo "Creating/updating API keys policy..."
+kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
+    sh -c "VAULT_ADDR=$VAULT_ADDR VAULT_TOKEN=$ROOT_TOKEN vault policy write api-keys-policy - <<EOF
+path \"secret/data/tatarlang/api/*\" {
+  capabilities = [\"read\", \"list\"]
+}
+
+path \"secret/metadata/tatarlang/api/*\" {
+  capabilities = [\"list\", \"read\"]
+}
+EOF" || echo "Warning: Failed to create API keys policy (may already exist)"
+
 # Enable AppRole authentication (if not already enabled)
 echo "Checking AppRole authentication..."
 if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
@@ -80,11 +93,11 @@ else
     echo "AppRole authentication already enabled"
 fi
 
-# Create AppRole for Tatarlang (if not exists)
+# Create AppRole for Tatarlang with multiple policies (if not exists)
 echo "Creating/updating AppRole for Tatarlang..."
 kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
     sh -c "VAULT_ADDR=$VAULT_ADDR VAULT_TOKEN=$ROOT_TOKEN vault write auth/approle/role/tatarlang-role \
-    token_policies=tatarlang-policy \
+    token_policies=tatarlang-policy,api-keys-policy \
     token_ttl=1h \
     token_max_ttl=4h" || echo "Warning: Failed to create AppRole (may already exist)"
 
@@ -135,6 +148,17 @@ kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
 kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
     sh -c "VAULT_ADDR=$VAULT_ADDR VAULT_TOKEN=$ROOT_TOKEN vault kv put secret/tatarlang/celery \
     CELERY_BROKER_URL=amqp://admin:admin@rabbitmq:5672//"
+
+# Store API keys for external APIs (OpenWeatherMap and NewsAPI)
+echo "Storing API keys in Vault..."
+# Note: Replace with actual API keys
+kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
+    sh -c "VAULT_ADDR=$VAULT_ADDR VAULT_TOKEN=$ROOT_TOKEN vault kv put secret/tatarlang/api/weather \
+    WEATHER_API_KEY=your_openweathermap_api_key_here" || echo "Warning: Failed to store weather API key"
+
+kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -c vault -- \
+    sh -c "VAULT_ADDR=$VAULT_ADDR VAULT_TOKEN=$ROOT_TOKEN vault kv put secret/tatarlang/api/news \
+    NEWS_API_KEY=your_newsapi_key_here" || echo "Warning: Failed to store news API key"
 
 echo "Vault setup completed!"
 

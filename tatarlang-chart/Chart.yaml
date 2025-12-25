@@ -18,8 +18,12 @@ dependencies:
     version: 0.1.0
     repository: "file://charts/postgresql"
     condition: postgresql.enabled
+  # RabbitMQ using Bitnami chart
+  # To use Cloud Pirates chart instead, change to:
+  # repository: https://cloudpirates.github.io/charts
   - name: rabbitmq
-    version: 0.1.0
-    repository: "file://charts/rabbitmq"
+    version: 14.0.0
+    repository: https://charts.bitnami.com/bitnami
     condition: rabbitmq.enabled
+    alias: rabbitmq-bitnami
 

@@ -6,7 +6,8 @@ from .views import (OrganizationAPIView,
                     EventViewSet, ExamViewSet,
                     submit_exam, ResultRetrieveAPIView,
                     ResultListAPIView, EnrollmentViewSet,
-                    CourseDetailAPIView, OrganizationCreateRetrieveUpdateAPIView)
+                    CourseDetailAPIView, OrganizationCreateRetrieveUpdateAPIView,
+                    trigger_weather_task, trigger_news_task, get_task_status)
 
 
 router = SimpleRouter()
@@ -31,5 +32,8 @@ urlpatterns = [
     path('v1/exam/submit', submit_exam, name='submit_exam'),
     path('v1/result/', ResultListAPIView.as_view(), name='result_list'),
     path('v1/result/<int:pk>', ResultRetrieveAPIView.as_view(), name='result_detail'),
+    path('v1/tasks/weather', trigger_weather_task, name='trigger_weather_task'),
+    path('v1/tasks/news', trigger_news_task, name='trigger_news_task'),
+    path('v1/tasks/<str:task_id>/status', get_task_status, name='get_task_status'),
     path('v1/', include(router.urls))
 ]

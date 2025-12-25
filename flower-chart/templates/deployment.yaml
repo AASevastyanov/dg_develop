@@ -1,0 +1,42 @@
+{{- if .Values.flower.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flower-chart.fullname" . }}
+  namespace: {{ include "flower-chart.namespace" . }}
+  labels:
+    {{- include "flower-chart.labels" . | nindent 4 }}
+    tier: flower
+spec:
+  replicas: {{ .Values.flower.replicas }}
+  selector:
+    matchLabels:
+      {{- include "flower-chart.selectorLabels" . | nindent 6 }}
+      tier: flower
+  template:
+    metadata:
+      labels:
+        {{- include "flower-chart.selectorLabels" . | nindent 8 }}
+        tier: flower
+    spec:
+      containers:
+        - name: flower
+          image: "{{ .Values.flower.image.repository }}:{{ .Values.flower.image.tag }}"
+          imagePullPolicy: {{ .Values.flower.image.pullPolicy }}
+          command:
+            ["celery", "-A", "tatarlang.celery", "flower", "--port=5555"]
+          ports:
+            - containerPort: {{ .Values.flower.service.port }}
+              protocol: TCP
+          env:
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flower-chart.fullname" . }}-celery-secret
+                  key: CELERY_BROKER_URL
+          {{- if .Values.flower.resources }}
+          resources:
+            {{- toYaml .Values.flower.resources | nindent 12 }}
+          {{- end }}
+{{- end }}
+

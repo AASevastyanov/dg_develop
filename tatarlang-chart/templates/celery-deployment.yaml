@@ -24,7 +24,7 @@ spec:
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           command:
-            ["celery", "-A", "tatarlang.celery", "worker", "--loglevel=info"]
+            ["celery", "-A", "tatarlang.celery", "worker", "--loglevel=info", "--config=celeryconfig"]
           envFrom:
             - configMapRef:
                 name: {{ include "tatarlang-chart.fullname" . }}-app-config
@@ -34,10 +34,23 @@ spec:
                 name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
             - secretRef:
                 name: {{ include "tatarlang-chart.fullname" . }}-rabbitmq-secret
+          {{- if .Values.env.enabled }}
+          volumeMounts:
+            - name: env-file
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+          {{- end }}
           {{- if .Values.celery.worker.resources }}
           resources:
             {{- toYaml .Values.celery.worker.resources | nindent 12 }}
           {{- end }}
+      {{- if .Values.env.enabled }}
+      volumes:
+        - name: env-file
+          configMap:
+            name: {{ include "tatarlang-chart.fullname" . }}-env-config
+      {{- end }}
 {{- end }}
 ---
 {{- if .Values.celery.beat.enabled }}
@@ -76,9 +89,22 @@ spec:
                 name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
             - secretRef:
                 name: {{ include "tatarlang-chart.fullname" . }}-rabbitmq-secret
+          {{- if .Values.env.enabled }}
+          volumeMounts:
+            - name: env-file
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+          {{- end }}
           {{- if .Values.celery.beat.resources }}
           resources:
             {{- toYaml .Values.celery.beat.resources | nindent 12 }}
           {{- end }}
+      {{- if .Values.env.enabled }}
+      volumes:
+        - name: env-file
+          configMap:
+            name: {{ include "tatarlang-chart.fullname" . }}-env-config
+      {{- end }}
 {{- end }}
 

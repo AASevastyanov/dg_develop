@@ -1,0 +1,47 @@
+# Default values for flower-chart
+
+global:
+  namespace: tatarlang
+  appName: flower
+
+namespace:
+  create: false
+  name: tatarlang
+
+flower:
+  enabled: true
+  image:
+    repository: tatarlang-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 5555
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: flower.tatarlang.local
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Secrets configuration
+secrets:
+  celery:
+    brokerUrl: "amqp://admin:admin@rabbitmq:5672//"
+
+# Vault integration
+vault:
+  enabled: false
+  refs:
+    celery:
+      brokerUrl: "ref+vault://secret/tatarlang/celery#CELERY_BROKER_URL"
+

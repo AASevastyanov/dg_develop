@@ -33,6 +33,33 @@ spec:
                 name: {{ include "tatarlang-chart.fullname" . }}-db-secret
             - secretRef:
                 name: {{ include "tatarlang-chart.fullname" . }}-celery-secret
+            - secretRef:
+                name: {{ include "tatarlang-chart.fullname" . }}-rabbitmq-secret
+          {{- if .Values.env.enabled }}
+          volumeMounts:
+            - name: env-file
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+          {{- end }}
+          {{- if .Values.backend.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.resources }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- end }}
+      {{- if .Values.env.enabled }}
+      volumes:
+        - name: env-file
+          configMap:
+            name: {{ include "tatarlang-chart.fullname" . }}-env-config
+      {{- end }}
           {{- if .Values.backend.readinessProbe }}
           readinessProbe:
             {{- toYaml .Values.backend.readinessProbe | nindent 12 }}

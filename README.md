@@ -9,10 +9,12 @@
 3. [Подробная инструкция](#подробная-инструкция)
 4. [Проверка работы](#проверка-работы)
 5. [Управление приложением](#управление-приложением)
-6. [Troubleshooting](#troubleshooting)
-7. [Развертывание в Kubernetes с Helm](#развертывание-в-kubernetes-с-helm)
-8. [Настройка Vault для управления секретами](#настройка-vault-для-управления-секретами)
-9. [Интеграция приложения с Vault](#интеграция-приложения-с-vault)
+6. [RabbitMQ Producer/Consumer](#rabbitmq-producerconsumer)
+7. [Celery задачи и API интеграции](#celery-задачи-и-api-интеграции)
+8. [Troubleshooting](#troubleshooting)
+9. [Развертывание в Kubernetes с Helm](#развертывание-в-kubernetes-с-helm)
+10. [Настройка Vault для управления секретами](#настройка-vault-для-управления-секретами)
+11. [Интеграция приложения с Vault](#интеграция-приложения-с-vault)
 
 ---
 
@@ -539,17 +541,47 @@ docker system prune -a --volumes
 
 ```
 dg_develop/
-├── backend/                 # Django backend приложение
-│   ├── tatarlang/          # Основное приложение
-│   ├── manage.py           # Django management script
-│   └── Dockerfile          # Docker образ для backend
-├── frontend/                # React frontend приложение
-│   ├── src/                # Исходный код
-│   ├── public/             # Статические файлы
-│   └── Dockerfile          # Docker образ для frontend
-├── docker-compose.yaml     # Конфигурация Docker Compose
-├── .env                    # Переменные окружения (создается вручную)
-└── README.md              # Этот файл
+├── backend/                    # Django backend приложение
+│   ├── api/                    # API приложение
+│   │   ├── tasks.py           # Celery задачи для API
+│   │   ├── views.py           # API views (включая endpoints для задач)
+│   │   └── urls.py            # URL маршруты
+│   ├── events/                 # Приложение событий
+│   │   └── tasks.py           # Celery задачи для событий
+│   ├── tatarlang/             # Основное приложение
+│   │   ├── celery.py          # Конфигурация Celery
+│   │   └── settings.py        # Настройки Django
+│   ├── rabbitmq_producer.py    # Producer для RabbitMQ
+│   ├── rabbitmq_consumer.py    # Consumer для RabbitMQ
+│   ├── celeryconfig.py        # Конфигурация Celery
+│   ├── manage.py              # Django management script
+│   ├── requirements.txt       # Python зависимости
+│   └── Dockerfile             # Docker образ для backend
+├── frontend/                   # React frontend приложение
+│   ├── src/                   # Исходный код
+│   ├── public/                # Статические файлы
+│   └── Dockerfile             # Docker образ для frontend
+├── tatarlang-chart/           # Helm chart для основного приложения
+│   ├── charts/                # Subcharts
+│   │   ├── postgresql/        # PostgreSQL subchart
+│   │   └── rabbitmq/         # RabbitMQ subchart (использует Bitnami)
+│   ├── templates/             # Kubernetes манифесты
+│   │   ├── backend-deployment.yaml
+│   │   ├── celery-deployment.yaml
+│   │   ├── rabbitmq-secret.yaml
+│   │   └── ...
+│   ├── values.yaml            # Значения по умолчанию
+│   └── values-vault.yaml      # Значения для Vault интеграции
+├── flower-chart/              # Helm chart для Flower
+│   ├── templates/             # Kubernetes манифесты для Flower
+│   └── values.yaml
+├── vault-chart/                # Helm chart для Vault
+│   ├── scripts/               # Скрипты настройки Vault
+│   │   └── vault-setup.sh    # Скрипт настройки политик и секретов
+│   └── templates/
+├── docker-compose.yaml        # Конфигурация Docker Compose
+├── .env                       # Переменные окружения (создается вручную)
+└── README.md                  # Этот файл
 ```
 
 ---
@@ -565,6 +597,9 @@ dg_develop/
 - `POSTGRES_PASSWORD` - пароль PostgreSQL
 - `RABBITMQ_USER` - пользователь RabbitMQ
 - `RABBITMQ_PASS` - пароль RabbitMQ
+- `CELERY_BROKER_URL` - URL брокера для Celery (например: `amqp://admin:admin@rabbitmq:5672//`)
+- `WEATHER_API_KEY` - API ключ для OpenWeatherMap (опционально)
+- `NEWS_API_KEY` - API ключ для NewsAPI (опционально)
 
 ### Полезные команды Docker
 
@@ -584,6 +619,205 @@ docker network ls
 # Использование ресурсов
 docker stats
 ```
+
+---
+
+## RabbitMQ Producer/Consumer
+
+Приложение включает Producer и Consumer для работы с RabbitMQ брокером сообщений.
+
+### Producer
+
+Producer отправляет сообщения в RabbitMQ exchange для выполнения задач интеграции с внешними API.
+
+**Использование:**
+
+```python
+from backend.rabbitmq_producer import RabbitMQProducer, send_weather_task, send_news_task
+
+# Простой способ
+send_weather_task(city="Kazan", country="RU")
+send_news_task(query="technology", language="en")
+
+# Продвинутый способ
+producer = RabbitMQProducer()
+producer.send_api_task(
+    api_alias="weather",
+    task_params={"city": "Moscow", "country": "RU"},
+    routing_key="weather"
+)
+producer.close()
+```
+
+### Consumer
+
+Consumer обрабатывает сообщения из очередей RabbitMQ и выполняет задачи.
+
+**Запуск через CLI:**
+
+```bash
+# Запуск consumer для очереди weather
+docker-compose exec backend python rabbitmq_consumer.py weather_queue weather
+
+# Запуск consumer для очереди news
+docker-compose exec backend python rabbitmq_consumer.py news_queue news
+```
+
+**Параметры:**
+- `queue_name` - имя очереди для создания/подключения
+- `routing_key` - ключ маршрутизации для привязки к exchange
+
+**Особенности:**
+- Создает durable очередь
+- Привязывает очередь к direct exchange
+- Сохраняет результаты API запросов в JSON файлы в `/app/api_responses/`
+- Поддерживает acknowledgement сообщений
+
+### Настройка API ключей
+
+Для работы с внешними API необходимо настроить ключи:
+
+**Через переменные окружения:**
+```bash
+# В .env файле
+WEATHER_API_KEY=your_openweathermap_api_key
+NEWS_API_KEY=your_newsapi_key
+```
+
+**Через Vault (в Kubernetes):**
+```bash
+# Ключи сохраняются в vault-setup.sh
+# Путь: secret/tatarlang/api/weather и secret/tatarlang/api/news
+```
+
+---
+
+## Celery задачи и API интеграции
+
+Приложение использует Celery для асинхронного выполнения задач, включая интеграции с внешними API.
+
+### Доступные задачи
+
+#### 1. Weather API Task
+Получение данных о погоде через OpenWeatherMap API.
+
+**Эндпоинт:** `POST /api/v1/tasks/weather`
+
+**Тело запроса:**
+```json
+{
+  "city": "Kazan",
+  "country": "RU"
+}
+```
+
+**Ответ:**
+```json
+{
+  "task_id": "abc123-def456-...",
+  "status": "PENDING",
+  "message": "Weather task has been queued"
+}
+```
+
+#### 2. News API Task
+Получение новостей через NewsAPI.
+
+**Эндпоинт:** `POST /api/v1/tasks/news`
+
+**Тело запроса:**
+```json
+{
+  "query": "technology",
+  "language": "en"
+}
+```
+
+**Ответ:**
+```json
+{
+  "task_id": "xyz789-abc123-...",
+  "status": "PENDING",
+  "message": "News task has been queued"
+}
+```
+
+### Проверка статуса задачи
+
+**Эндпоинт:** `GET /api/v1/tasks/<task_id>/status`
+
+**Пример запроса:**
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/api/v1/tasks/abc123-def456-/status
+```
+
+**Возможные статусы:**
+- `PENDING` - задача ожидает выполнения
+- `PROGRESS` - задача выполняется
+- `SUCCESS` - задача выполнена успешно
+- `FAILURE` - задача завершилась с ошибкой
+
+**Пример ответа (SUCCESS):**
+```json
+{
+  "task_id": "abc123-def456-...",
+  "state": "SUCCESS",
+  "result": {
+    "status": "success",
+    "city": "Kazan",
+    "country": "RU",
+    "data": { ... },
+    "file": "/app/api_responses/weather_Kazan_RU.json"
+  }
+}
+```
+
+### Мониторинг через Flower
+
+Flower предоставляет веб-интерфейс для мониторинга Celery задач.
+
+**Доступ:**
+- Docker Compose: http://localhost:5555
+- Kubernetes: http://flower.tatarlang.local (через ingress)
+
+**Возможности:**
+- Просмотр активных задач
+- История выполненных задач
+- Мониторинг воркеров
+- Статистика производительности
+
+### Использование через API
+
+**Пример с curl:**
+
+```bash
+# 1. Получить токен авторизации
+TOKEN=$(curl -X POST http://localhost:8000/api/v1/jwt/create/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password"}' \
+  | jq -r '.access')
+
+# 2. Запустить задачу погоды
+TASK_RESPONSE=$(curl -X POST http://localhost:8000/api/v1/tasks/weather \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"city":"Kazan","country":"RU"}')
+
+TASK_ID=$(echo $TASK_RESPONSE | jq -r '.task_id')
+
+# 3. Проверить статус
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/v1/tasks/$TASK_ID/status
+```
+
+### Результаты выполнения
+
+Результаты API запросов сохраняются в JSON файлы:
+- Weather: `/app/api_responses/weather_<city>_<country>.json`
+- News: `/app/api_responses/news_<query>_<language>.json`
+
+В Kubernetes файлы сохраняются в volume пода.
 
 ---
 
@@ -704,7 +938,22 @@ eval $(minikube docker-env -u)
 
 **Примечание**: Если используете Docker Desktop с Kubernetes, образы можно собрать обычным способом, но нужно убедиться, что они доступны в кластере.
 
-### Шаг 4: Установка приложения
+### Шаг 4: Установка зависимостей Helm чарта
+
+Перед установкой необходимо обновить зависимости:
+
+```bash
+# Перейти в директорию чарта
+cd tatarlang-chart
+
+# Обновить зависимости (включая Bitnami RabbitMQ chart)
+helm dependency update
+
+# Вернуться в корень проекта
+cd ..
+```
+
+### Шаг 5: Установка приложения
 
 ```bash
 # Установка чарта с указанием namespace
@@ -718,7 +967,24 @@ helm list -n tatarlang
 kubectl get pods -n tatarlang
 ```
 
-### Шаг 5: Проверка работы приложения
+**Примечание:** RabbitMQ развертывается через Bitnami Helm chart. Для использования Cloud Pirates chart измените зависимость в `tatarlang-chart/Chart.yaml`.
+
+### Шаг 6: Установка Flower (опционально)
+
+Flower можно установить отдельным чартом:
+
+```bash
+# Установка Flower чарта
+helm install flower ./flower-chart \
+  --namespace tatarlang \
+  --create-namespace \
+  --set vault.enabled=false
+
+# Проверка
+kubectl get pods -n tatarlang | grep flower
+```
+
+### Шаг 7: Проверка работы приложения
 
 ```bash
 # Проверить статус подов
@@ -739,8 +1005,19 @@ kubectl port-forward -n tatarlang svc/frontend 3000:3000
 После этого приложение будет доступно:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
+- RabbitMQ Management: через ingress на `rabbitmq.tatarlang.local` или через port-forward
+- Flower: через ingress на `flower.tatarlang.local` или через port-forward
 
-### Шаг 6: Обновление приложения
+**Port-forward для доступа:**
+```bash
+# RabbitMQ Management
+kubectl port-forward -n tatarlang svc/tatarlang-rabbitmq 15672:15672
+
+# Flower
+kubectl port-forward -n tatarlang svc/flower 5555:5555
+```
+
+### Шаг 8: Обновление приложения
 
 ```bash
 # Обновление чарта
@@ -750,7 +1027,7 @@ helm upgrade tatarlang ./tatarlang-chart -n tatarlang
 helm upgrade tatarlang ./tatarlang-chart -n tatarlang -f my-values.yaml
 ```
 
-### Шаг 7: Удаление приложения
+### Шаг 9: Удаление приложения
 
 ```bash
 # Удаление release
@@ -974,9 +1251,14 @@ export VAULT_ROOT_TOKEN=$(cat ../../vault-keys/root-token.txt)
 Скрипт выполнит:
 - Включение KV v2 secret engine
 - Создание политики доступа (tatarlang-policy)
+- Создание политики для API ключей (api-keys-policy)
 - Включение AppRole аутентификации
-- Создание AppRole (tatarlang-role)
-- Сохранение секретов в Vault
+- Создание AppRole (tatarlang-role) с поддержкой нескольких политик
+- Сохранение секретов в Vault:
+  - PostgreSQL (db)
+  - RabbitMQ (rabbitmq)
+  - Celery (celery)
+  - API ключи (api/weather, api/news)
 
 После выполнения скрипта будут сохранены:
 - `vault-keys/role-id.txt` - Role ID для AppRole
@@ -1067,14 +1349,22 @@ kubectl logs -n tatarlang -l tier=backend
 В файле `values-vault.yaml` используются ссылки на секреты в формате:
 
 ```yaml
-secrets:
-  postgres:
-    user: "ref+vault://secret/tatarlang/db#POSTGRES_USER"
-    password: "ref+vault://secret/tatarlang/db#POSTGRES_PASSWORD"
-  rabbitmq:
-    user: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_USER"
-    password: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_PASS"
+vault:
+  enabled: true
+  refs:
+    postgres:
+      user: "ref+vault://secret/tatarlang/db#POSTGRES_USER"
+      password: "ref+vault://secret/tatarlang/db#POSTGRES_PASSWORD"
+    rabbitmq:
+      user: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_USER"
+      password: "ref+vault://secret/tatarlang/rabbitmq#RABBITMQ_PASS"
+    celery:
+      brokerUrl: "ref+vault://secret/tatarlang/celery#CELERY_BROKER_URL"
 ```
+
+**API ключи в Vault:**
+- `secret/tatarlang/api/weather#WEATHER_API_KEY` - ключ OpenWeatherMap
+- `secret/tatarlang/api/news#NEWS_API_KEY` - ключ NewsAPI
 
 ### Troubleshooting Vault
 
@@ -1120,6 +1410,66 @@ vals eval -f values-vault.yaml | helm install ...
 
 ---
 
+## Дополнительные возможности
+
+### Использование RabbitMQ Producer/Consumer в коде
+
+```python
+# В Django view или management command
+from backend.rabbitmq_producer import RabbitMQProducer
+
+producer = RabbitMQProducer()
+try:
+    producer.send_api_task(
+        api_alias="weather",
+        task_params={"city": "Kazan", "country": "RU"},
+        routing_key="weather"
+    )
+finally:
+    producer.close()
+```
+
+### Запуск Consumer в Kubernetes
+
+```bash
+# Создать Job для consumer
+kubectl create job -n tatarlang weather-consumer \
+  --image=tatarlang-backend:latest \
+  -- python rabbitmq_consumer.py weather_queue weather
+
+# Проверить логи
+kubectl logs -n tatarlang job/weather-consumer
+```
+
+### Мониторинг Celery через Flower
+
+Flower предоставляет:
+- Список активных задач
+- История выполненных задач
+- Статистику по воркерам
+- Графики производительности
+- Управление воркерами
+
+### Настройка RabbitMQ в Kubernetes
+
+RabbitMQ развертывается через Bitnami Helm chart с:
+- LoadBalancer сервисом для внешнего доступа
+- Ingress для веб-интерфейса управления
+- Persistent storage для данных
+- Аутентификацией через секреты из Vault
+
+**Для Yandex Cloud:**
+Добавьте аннотации в `values.yaml`:
+```yaml
+rabbitmq:
+  service:
+    annotations:
+      yandex.cloud/load-balancer-type: "external"
+      yandex.cloud/subnet-id: "your-subnet-id"
+```
+
+---
+
 ## Поддержка
 
 При возникновении проблем:
@@ -1129,6 +1479,25 @@ vals eval -f values-vault.yaml | helm install ...
 3. Убедитесь, что все порты свободны
 4. Проверьте, что Docker Desktop запущен (macOS/Windows)
 5. Проверьте системные требования
+6. Для RabbitMQ: проверьте подключение через Management UI
+7. Для Celery: проверьте статус воркеров через Flower
+8. Для задач: проверьте логи через `docker-compose logs celery_worker`
+
+### Полезные команды для отладки
+
+```bash
+# Проверка RabbitMQ
+docker-compose exec rabbitmq rabbitmqctl status
+
+# Проверка Celery воркеров
+docker-compose exec celery_worker celery -A tatarlang.celery inspect active
+
+# Просмотр результатов API задач
+docker-compose exec backend ls -la /app/api_responses/
+
+# Проверка подключения к RabbitMQ
+docker-compose exec backend python -c "import pika; print('OK')"
+```
 
 ---
 

@@ -237,3 +237,87 @@ class EnrollmentViewSet(mixins.CreateModelMixin,
 
     def get_queryset(self):
         return Enrollment.objects.filter(user=self.request.user)
+
+
+# Celery task views
+from celery.result import AsyncResult
+from api.tasks import fetch_weather_task, fetch_news_task
+
+
+@swagger_auto_schema(methods=['post'], request_body=None)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def trigger_weather_task(request):
+    """
+    Trigger weather API task.
+    
+    Expected body:
+    {
+        "city": "Kazan",
+        "country": "RU"
+    }
+    """
+    city = request.data.get('city', 'Kazan')
+    country = request.data.get('country', 'RU')
+    
+    task = fetch_weather_task.delay(city, country)
+    
+    return Response({
+        'task_id': task.id,
+        'status': 'PENDING',
+        'message': 'Weather task has been queued'
+    }, status=202)
+
+
+@swagger_auto_schema(methods=['post'], request_body=None)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def trigger_news_task(request):
+    """
+    Trigger news API task.
+    
+    Expected body:
+    {
+        "query": "technology",
+        "language": "en"
+    }
+    """
+    query = request.data.get('query', 'technology')
+    language = request.data.get('language', 'en')
+    
+    task = fetch_news_task.delay(query, language)
+    
+    return Response({
+        'task_id': task.id,
+        'status': 'PENDING',
+        'message': 'News task has been queued'
+    }, status=202)
+
+
+@swagger_auto_schema(methods=['get'])
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_task_status(request, task_id):
+    """
+    Get status of a Celery task.
+    
+    Returns task state and result if available.
+    """
+    task_result = AsyncResult(task_id)
+    
+    response_data = {
+        'task_id': task_id,
+        'state': task_result.state,
+    }
+    
+    if task_result.state == 'PENDING':
+        response_data['message'] = 'Task is waiting to be processed'
+    elif task_result.state == 'PROGRESS':
+        response_data['current'] = task_result.info.get('current', 0)
+        response_data['total'] = task_result.info.get('total', 1)
+    elif task_result.state == 'SUCCESS':
+        response_data['result'] = task_result.result
+    elif task_result.state == 'FAILURE':
+        response_data['error'] = str(task_result.info)
+    
+    return Response(response_data, status=200)

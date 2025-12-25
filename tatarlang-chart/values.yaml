@@ -83,17 +83,40 @@ postgresql:
       cpu: 500m
       memory: 512Mi
 
-# RabbitMQ configuration
+# RabbitMQ configuration (using Bitnami chart)
 rabbitmq:
   enabled: true
-  image:
-    repository: rabbitmq
-    tag: "3-management"
-  replicas: 1
+  # Bitnami chart configuration
+  # Note: existingPasswordSecret will be dynamically set by the secret template
+  # The secret name format is: <release-name>-rabbitmq
+  auth:
+    existingPasswordSecret: ""  # Will be set dynamically in template
+    existingPasswordSecretKeys:
+      adminPasswordKey: rabbitmq-password
+      adminUsernameKey: rabbitmq-username
   service:
-    type: ClusterIP
-    amqpPort: 5672
-    httpPort: 15672
+    type: LoadBalancer
+    annotations: {}
+    # For Yandex Cloud, uncomment and set:
+    # yandex.cloud/load-balancer-type: "external"
+    # yandex.cloud/subnet-id: "your-subnet-id"
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: rabbitmq.tatarlang.local
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls: true
+    extraTls:
+      - hosts:
+          - rabbitmq.tatarlang.local
+        secretName: rabbitmq-tls
+    path: /
+    pathType: Prefix
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
   resources:
     requests:
       cpu: 100m
@@ -171,6 +194,11 @@ config:
     settingsModule: tatarlang.settings
   frontend:
     apiUrl: "https://tatarlang.local/api/v1"
+
+# Environment file configuration (.env from ConfigMap)
+# Note: Sensitive values are loaded via Secret envFrom in deployments
+env:
+  enabled: true
 
 # Secrets - these should be replaced with vault refs when vault.enabled=true
 secrets:

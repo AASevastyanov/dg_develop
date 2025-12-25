@@ -1,0 +1,21 @@
+{{- if .Values.flower.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "flower-chart.fullname" . }}
+  namespace: {{ include "flower-chart.namespace" . }}
+  labels:
+    {{- include "flower-chart.labels" . | nindent 4 }}
+    tier: flower
+spec:
+  type: {{ .Values.flower.service.type }}
+  ports:
+    - port: {{ .Values.flower.service.port }}
+      targetPort: {{ .Values.flower.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "flower-chart.selectorLabels" . | nindent 4 }}
+    tier: flower
+{{- end }}
+

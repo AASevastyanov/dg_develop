@@ -1,17 +1,56 @@
-enabled: true
-image:
-  repository: rabbitmq
-  tag: "3-management"
-replicas: 1
-service:
-  type: ClusterIP
-  amqpPort: 5672
-  httpPort: 15672
-resources:
-  requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
+# RabbitMQ configuration using Bitnami chart
+# To use Cloud Pirates chart instead, change the repository in Chart.yaml to:
+# repository: https://cloudpirates.github.io/charts
+# and adjust values accordingly
 
+rabbitmq:
+  enabled: true
+  
+  # Authentication
+  auth:
+    username: ""  # Will be set from vault secret
+    password: ""   # Will be set from vault secret
+    existingPasswordSecret: ""  # Will be set from parent chart
+  
+  # Service configuration
+  service:
+    type: LoadBalancer
+    annotations:
+      # For Yandex Cloud, uncomment the following:
+      # yandex.cloud/load-balancer-type: "external"
+      # yandex.cloud/subnet-id: "your-subnet-id"
+    ports:
+      amqp: 5672
+      management: 15672
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: rabbitmq.tatarlang.local
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls: true
+    extraTls:
+      - hosts:
+          - rabbitmq.tatarlang.local
+        secretName: rabbitmq-tls
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Metrics
+  metrics:
+    enabled: false

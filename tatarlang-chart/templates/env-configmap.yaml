@@ -1,0 +1,25 @@
+{{- /* 
+  ConfigMap for generating .env file from various secrets.
+  This allows adding environment variables from multiple secret sources.
+  Note: In practice, secrets should be loaded via envFrom in deployments.
+  This ConfigMap is for additional non-sensitive configuration.
+*/}}
+{{- if .Values.env.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tatarlang-chart.fullname" . }}-env-config
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+data:
+  .env: |
+    # Environment variables from ConfigMap
+    POSTGRES_DB={{ .Values.config.postgres.db }}
+    POSTGRES_HOST={{ .Values.config.postgres.host }}
+    POSTGRES_PORT={{ .Values.config.postgres.port }}
+    DJANGO_SETTINGS_MODULE={{ .Values.config.django.settingsModule }}
+    REACT_APP_API_URL={{ .Values.config.frontend.apiUrl }}
+    # Note: Sensitive values (passwords, API keys) should be loaded via Secret envFrom
+{{- end }}
+
