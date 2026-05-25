@@ -60,17 +60,5 @@ spec:
           configMap:
             name: {{ include "tatarlang-chart.fullname" . }}-env-config
       {{- end }}
-          {{- if .Values.backend.readinessProbe }}
-          readinessProbe:
-            {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
-          {{- end }}
-          {{- if .Values.backend.livenessProbe }}
-          livenessProbe:
-            {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
-          {{- end }}
-          {{- if .Values.backend.resources }}
-          resources:
-            {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- end }}
 {{- end }}
 

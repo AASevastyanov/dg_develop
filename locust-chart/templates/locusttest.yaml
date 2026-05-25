@@ -1,0 +1,30 @@
+apiVersion: locust.io/v2
+kind: LocustTest
+metadata:
+  name: {{ .Values.locust.testName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "locust-chart.labels" . | nindent 4 }}
+spec:
+  image: "{{ .Values.locust.image.repository }}:{{ .Values.locust.image.tag }}"
+  imagePullPolicy: {{ .Values.locust.image.pullPolicy }}
+  testFiles:
+    configMapRef: {{ .Values.locust.testFile.configMapName }}
+  master:
+    command: >-
+      --locustfile /lotest/src/{{ .Values.locust.testFile.fileName }}
+      --host {{ .Values.locust.scenario.host }}
+      --users {{ .Values.locust.scenario.users }}
+      --spawn-rate {{ .Values.locust.scenario.spawnRate }}
+      --run-time {{ .Values.locust.scenario.runTime }}
+    autostart: {{ .Values.locust.master.autostart }}
+    autoquit:
+      enabled: {{ .Values.locust.master.autoquit.enabled }}
+      timeout: {{ .Values.locust.master.autoquit.timeout }}
+    resources:
+      {{- toYaml .Values.locust.master.resources | nindent 6 }}
+  worker:
+    replicas: {{ .Values.locust.scenario.workerReplicas }}
+    command: "--locustfile /lotest/src/{{ .Values.locust.testFile.fileName }}"
+    resources:
+      {{- toYaml .Values.locust.worker.resources | nindent 6 }}

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.locust.testFile.configMapName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "locust-chart.labels" . | nindent 4 }}
+data:
+  {{ .Values.locust.testFile.fileName }}: |
+{{ .Values.locust.testFile.content | indent 4 }}

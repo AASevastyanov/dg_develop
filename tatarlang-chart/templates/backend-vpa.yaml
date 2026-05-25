@@ -1,0 +1,26 @@
+{{- if and .Values.backend.enabled .Values.backend.autoscaling.vpa.enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: backend-vpa
+  namespace: {{ include "tatarlang-chart.namespace" . }}
+  labels:
+    {{- include "tatarlang-chart.labels" . | nindent 4 }}
+    tier: backend
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  updatePolicy:
+    updateMode: {{ .Values.backend.autoscaling.vpa.updateMode | quote }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: backend
+        controlledResources:
+          {{- toYaml .Values.backend.autoscaling.vpa.controlledResources | nindent 10 }}
+        minAllowed:
+          {{- toYaml .Values.backend.autoscaling.vpa.minAllowed | nindent 10 }}
+        maxAllowed:
+          {{- toYaml .Values.backend.autoscaling.vpa.maxAllowed | nindent 10 }}
+{{- end }}

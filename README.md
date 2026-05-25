@@ -15,6 +15,7 @@
 9. [Развертывание в Kubernetes с Helm](#развертывание-в-kubernetes-с-helm)
 10. [Настройка Vault для управления секретами](#настройка-vault-для-управления-секретами)
 11. [Интеграция приложения с Vault](#интеграция-приложения-с-vault)
+12. [Масштабирование и нагрузочное тестирование](#масштабирование-и-нагрузочное-тестирование)
 
 ---
 
@@ -1467,6 +1468,160 @@ rabbitmq:
       yandex.cloud/load-balancer-type: "external"
       yandex.cloud/subnet-id: "your-subnet-id"
 ```
+
+---
+
+## Масштабирование и нагрузочное тестирование
+
+Ниже приведен полный сценарий для задания по масштабированию: сбор метрик, stress-тест, настройка HPA/VPA и деплой Locust через оператор.
+
+### Часть 1. Метрики и стартовые лимиты
+
+#### 1) Установка metrics-server
+
+```bash
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm repo update
+helm upgrade --install metrics-server metrics-server/metrics-server \
+  -n kube-system \
+  --set args[0]=--kubelet-insecure-tls
+```
+
+Проверка:
+
+```bash
+kubectl get pods -n kube-system -l app.kubernetes.io/name=metrics-server
+kubectl top nodes
+kubectl top pods -n tatarlang
+```
+
+#### 2) Стартовые requests/limits
+
+Стартовые лимиты для API уже добавлены в `tatarlang-chart/values.yaml`:
+
+- `backend.resources.requests`: `cpu: 200m`, `memory: 384Mi`
+- `backend.resources.limits`: `cpu: 750m`, `memory: 768Mi`
+
+Проверка после деплоя:
+
+```bash
+helm upgrade --install tatarlang ./tatarlang-chart -n tatarlang
+kubectl describe deployment backend -n tatarlang | grep -A6 "Limits\|Requests"
+```
+
+#### 3) Исследование потребления
+
+Во время нагрузки снимайте метрики каждые 15-30 секунд:
+
+```bash
+kubectl top pods -n tatarlang --containers
+kubectl top pod -n tatarlang -l tier=backend
+```
+
+Сохраняйте пиковые значения CPU и RAM для backend и используйте их при корректировке `requests/limits`.
+
+### Часть 2. Stress-тесты на Locust
+
+Для локального запуска теста добавлены файлы:
+
+- `load-tests/locustfile.py`
+- `load-tests/locust.conf`
+- `load-tests/requirements.txt`
+
+#### 1) Установка Locust
+
+```bash
+cd load-tests
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### 2) Запуск теста
+
+```bash
+locust -f locustfile.py --config locust.conf
+```
+
+Параметры из `locust.conf`:
+
+- URL: `host=http://localhost:8000`
+- Максимум пользователей: `users=200`
+- Прирост пользователей в секунду: `spawn-rate=10`
+- Длительность: `run-time=10m`
+
+#### 3) Поиск критической точки
+
+Поднимайте `users` ступенчато (например: 200 -> 300 -> 400 -> 500), пока выполняются условия:
+
+- запросы без ошибок (нулевой или минимальный процент фейлов);
+- среднее время ответа < 5-7 секунд.
+
+В критической точке снова снимите метрики `kubectl top` и скорректируйте `backend.resources` в `tatarlang-chart/values.yaml`.
+
+### Часть 3. HPA и VPA для API
+
+Добавлены манифесты:
+
+- `tatarlang-chart/templates/backend-hpa.yaml`
+- `tatarlang-chart/templates/backend-vpa.yaml`
+
+Настройки задаются в `tatarlang-chart/values.yaml`:
+
+- HPA: `backend.autoscaling.hpa.*`
+- VPA: `backend.autoscaling.vpa.*`
+
+Текущие best-practice настройки:
+
+- HPA по CPU (70%) и Memory (75%)
+- плавный scale-up и стабилизация scale-down (300 сек)
+- VPA в режиме `Off` для безопасного получения рекомендаций
+- VPA управляет памятью (`controlledResources: [memory]`), чтобы не конфликтовать с HPA по CPU
+
+Проверка:
+
+```bash
+helm upgrade --install tatarlang ./tatarlang-chart -n tatarlang
+kubectl get hpa,vpa -n tatarlang
+kubectl describe hpa backend-hpa -n tatarlang
+kubectl describe vpa backend-vpa -n tatarlang
+```
+
+В `describe vpa` должен появиться блок рекомендаций по памяти (`Recommendation`).
+
+### Часть 4. Деплой Locust через locust-operator
+
+Добавлен отдельный чарт `locust-chart`:
+
+- `ConfigMap` с `locustfile.py`
+- `LocustTest` (`apiVersion: locust.io/v2`)
+- `Ingress` на сервис `load-test-v2-webui:8089`
+
+#### 1) Установка locust-operator
+
+```bash
+helm repo add locust-k8s-operator https://abdelrhmanhamouda.github.io/locust-k8s-operator
+helm repo update
+helm upgrade --install locust-operator locust-k8s-operator/locust-k8s-operator \
+  -n locust-system \
+  --create-namespace
+```
+
+#### 2) Деплой теста через чарт
+
+```bash
+helm upgrade --install locust ./locust-chart -n tatarlang
+kubectl get locusttest -n tatarlang
+kubectl get ingress -n tatarlang | grep load-test-v2-webui
+```
+
+Проверка web UI:
+
+```bash
+kubectl port-forward -n tatarlang svc/load-test-v2-webui 8089:8089
+```
+
+Затем откройте `http://localhost:8089`.
 
 ---
 
